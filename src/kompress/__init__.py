@@ -1,6 +1,5 @@
-"""
-Various helpers for compression
-"""
+# TODO add a note that these were in HPI originally?
+
 from __future__ import annotations
 
 from datetime import datetime
