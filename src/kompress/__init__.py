@@ -9,6 +9,7 @@ import pathlib
 from pathlib import Path
 import sys
 import tarfile
+import gzip
 from typing import (
     Any,
     Iterator,
@@ -30,13 +31,15 @@ class Ext:
     zstd  = '.zstd'
     zst   = '.zst'
     targz = '.tar.gz'
+    gz    = '.gz'
     # fmt: on
 
 
-def is_compressed(p: Path) -> bool:
+def is_compressed(p: PathIsh) -> bool:
+    pp = p if isinstance(p, Path) else Path(p)
     # todo kinda lame way for now.. use mime ideally?
     # should cooperate with kompress.kopen?
-    return any(p.name.endswith(ext) for ext in {Ext.xz, Ext.zip, Ext.lz4, Ext.zstd, Ext.zst, Ext.targz})
+    return any(pp.name.endswith(ext) for ext in {Ext.xz, Ext.zip, Ext.lz4, Ext.zstd, Ext.zst, Ext.targz, Ext.gz})
 
 
 def _zstd_open(path: Path, *args, **kwargs) -> IO:
@@ -110,6 +113,28 @@ def kopen(path: PathIsh, *args, mode: str = 'rt', **kwargs) -> IO:
         x = tf.extractfile(*args)
         assert x is not None
         return x
+    elif name.endswith(Ext.gz):
+        # for gzip 'r' means 'rb' returns a gzip.Gzipfile (in binary mode)
+        # here, 'r' defaults to 'rt', to read as text
+        #
+        # https://docs.python.org/3/library/gzip.html#gzip.open
+        #
+        # if you supply mode 'rb', this *will* return bytes, but
+        # sort of defeats the point of kopen
+        if mode == 'r':
+            mode = 'rt'
+
+        kwargs['mode'] = mode
+
+        # gzip does not support encoding in binary mode
+        encoding = kwargs['encoding']
+
+        if 'b' in mode:
+            del kwargs['encoding']
+
+        # gzip.open already returns a io.TextIOWrapper if encoding is specified
+        # and its not in binary mode
+        return gzip.open(pp, *args, **kwargs)
     else:
         return pp.open(mode, *args, **kwargs)
 
