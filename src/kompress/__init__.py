@@ -127,8 +127,6 @@ def kopen(path: PathIsh, *args, mode: str = 'rt', **kwargs) -> IO:
         kwargs['mode'] = mode
 
         # gzip does not support encoding in binary mode
-        encoding = kwargs['encoding']
-
         if 'b' in mode:
             del kwargs['encoding']
 
