@@ -38,13 +38,13 @@ local_scheme = "dirty-tag"
 
 
 # nice things about pyproject.toml
-# - zip_safe=False isn't neccessary anymore
+# - zip_safe=False isn't necessary anymore
 # - correctly discovers namespace packages by defuilt?
 # - correctly handles py.typed by default?
 # - handles src layout automatically https://setuptools.pypa.io/en/latest/userguide/package_discovery.html#src-layout
 
 # things I'm not sure about yet
-# - avoiding dupliation/variable reuse?
+# - avoiding duplication/variable reuse?
 # - file/git dependencies?
 # - unclear how to specify namespace package order https://github.com/seanbreckenridge/reorder_editable/issues/2
 

@@ -1,6 +1,8 @@
+import io
 import lzma
 from pathlib import Path
 import zipfile
+import gzip
 
 import pytest
 
@@ -125,3 +127,35 @@ def test_zippath() -> None:
     # unzip -l shows the date  as 2021-07-01 09:43
     # however, python reads it as 2021-07-01 01:43 ??
     # don't really feel like dealing with this for now, it's not tz aware anyway
+
+def test_gz(tmp_path: Path) -> None:
+    gzf = tmp_path / 'file.gz'
+    with gzip.open(gzf, 'wb') as f:
+        f.write(b'compressed text')
+
+    # test against gzip magic number
+    assert gzf.read_bytes()[:2] == b'\x1f\x8b'
+
+    with kopen(gzf) as f:
+        assert hasattr(f, 'read')
+        assert hasattr(f, 'readable')
+        assert f.readable()
+        assert not f.writable()
+        assert f.read() == 'compressed text'  # if not specified, defaults to rt
+
+    with kopen(gzf, mode='rb') as f:
+        assert isinstance(f, gzip.GzipFile)
+        assert f.read() == b'compressed text'
+
+    # should return text
+    with CPath(gzf).open(mode='r') as f:
+        assert isinstance(f, io.TextIOWrapper)
+        assert f.read() == 'compressed text'
+
+    # if you specify, rt, does what you expect
+    with CPath(gzf).open(mode='rt') as f:
+        assert isinstance(f, io.TextIOWrapper)
+        assert f.read() == 'compressed text'
+
+    assert CPath(gzf).read_text() == 'compressed text'
+    assert CPath(gzf).read_bytes() == b'compressed text'
