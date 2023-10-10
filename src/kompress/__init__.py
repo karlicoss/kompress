@@ -43,10 +43,10 @@ def is_compressed(p: PathIsh) -> bool:
 
 
 def _zstd_open(path: Path, *args, **kwargs) -> IO:
-    import zstandard as zstd  # type: ignore
+    import zstandard
 
     fh = path.open('rb')
-    dctx = zstd.ZstdDecompressor()
+    dctx = zstandard.ZstdDecompressor()
     reader = dctx.stream_reader(fh)
 
     mode = kwargs.get('mode', 'rt')
