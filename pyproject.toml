@@ -26,6 +26,9 @@ testing = [
     "mypy",
     "lxml",  # for mypy html coverage
 ]
+zstd = [
+    "zstandard",
+]
 
 
 [build-system]
