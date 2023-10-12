@@ -25,8 +25,8 @@ This currently supports these archive formats:
 
 - `.xz`
 - `.zip`
-- `.lz4`
-- `.zstd`
+- `.lz4` (`pip install 'kompress[lz4]'`)
+- `.zstd` (`pip install 'kompress[zstd]'`)
 - `.zst`
 - `.tar.gz`
 - `.gz`

@@ -29,6 +29,9 @@ testing = [
 zstd = [
     "zstandard",
 ]
+lz4 = [
+    "lz4"
+]
 
 
 [build-system]
