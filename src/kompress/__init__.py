@@ -4,16 +4,19 @@ from __future__ import annotations
 
 from datetime import datetime
 from functools import total_ordering
+import gzip
 import io
+import os
 import pathlib
 from pathlib import Path
+import posixpath
 import sys
 import tarfile
-import gzip
 from typing import (
-    Any,
+    TYPE_CHECKING,
     Iterator,
     IO,
+    List,
     Sequence,
     Union,
 )
@@ -83,22 +86,13 @@ def kopen(path: PathIsh, *args, mode: str = 'rt', **kwargs) -> IO:
         kwargs['mode'] = mode
         return lzma.open(pp, *args, **kwargs)
     elif name.endswith(Ext.zip):
-        # eh. this behaviour is a bit dodgy...
-        zfile = zipfile.ZipFile(pp)
-
+        zpath = ZipPath(pp)
         [subpath] = args  # meh?
-
-        ## oh god... https://stackoverflow.com/a/5639960/706389
-        ifile = zfile.open(subpath, mode='r')
-        # fmt: off
-        ifile.readable = lambda: True   # type: ignore
-        ifile.writable = lambda: False  # type: ignore
-        ifile.seekable = lambda: False  # type: ignore
-        ifile.read1    = ifile.read     # type: ignore
-        # fmt: on
-        # TODO pass all kwargs here??
-        # todo 'expected "BinaryIO"'??
-        return io.TextIOWrapper(ifile, encoding=encoding)
+        if sys.version_info[:2] == (3, 8):
+            if mode == 'rt':
+                mode = 'r'  # ugh, 3.8 doesn't support rt here
+        # TODO pass **kwargs later to support encoding? kinda annoying, 3.8 doesn't support it
+        return (zpath / subpath).open(mode=mode)
     elif name.endswith(Ext.lz4):
         import lz4.frame  # type: ignore
 
@@ -137,10 +131,7 @@ def kopen(path: PathIsh, *args, mode: str = 'rt', **kwargs) -> IO:
         return pp.open(mode, *args, **kwargs)
 
 
-import typing
-import os
-
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     # otherwise mypy can't figure out that BasePath is a type alias..
     BasePath = pathlib.Path
 else:
@@ -156,6 +147,17 @@ class CPath(BasePath):
     Path only has _accessor and _closed slots, so can't directly set .open method
     _accessor.open has to return file descriptor, doesn't work for compressed stuff.
     """
+
+    def __new__(cls, *args, **kwargs):
+        path = Path(*args)
+        if path.name.endswith(Ext.zip):
+            # We need a special case here, since zip always needs a subpath
+            # If we just construct CPath(zip_archive) / "path/inside/zip"
+            # , then it's hard for kopen to know if it's a zip without looking at individual path parts
+            # This way it's a bit more explicit.
+            # possibly useful for tar.gz as well?
+            return ZipPath(path)
+        return super().__new__(cls, *args, **kwargs)
 
     def open(self, *args, **kwargs):
         kopen_kwargs = {}
@@ -183,28 +185,28 @@ def kexists(path: PathIsh, subpath: str) -> bool:
         return False
 
 
-if sys.version_info[:2] >= (3, 8):
-    # meh... zipfile.Path is not available on 3.7
-    zipfile_Path = zipfile.Path
-else:
-    if typing.TYPE_CHECKING:
-        zipfile_Path = Any
-    else:
-        zipfile_Path = object
-
-
 @total_ordering
-class ZipPath(zipfile_Path):
+class ZipPath(zipfile.Path):
     # NOTE: is_dir/is_file might not behave as expected, the base class checks it only based on the slash in path
+
+    _flavour = posixpath  # this is necessary for some pathlib operations (in particular python 3.12)
 
     # seems that root/at are not exposed in the docs, so might be an implementation detail
     root: zipfile.ZipFile
     at: str
 
+    def __new__(cls, *args, **kwargs):
+        if len(args) == 1 and isinstance(args[0], ZipPath):
+            # hack to make sure ZipPath(ZipPath(...)) works
+            zp = args[0]
+            return zipfile.Path(zp.filepath, zp.at)
+        return super().__new__(cls)
+
     @property
     def filepath(self) -> Path:
         res = self.root.filename
         assert res is not None  # make mypy happy
+        assert isinstance(res, str)
         return Path(res)
 
     @property
@@ -223,9 +225,9 @@ class ZipPath(zipfile_Path):
             return self.filepath.exists()
         return super().exists() or self._as_dir().exists()
 
-    def _as_dir(self) -> zipfile_Path:
+    def _as_dir(self) -> zipfile.Path:
         # note: seems that zip always uses forward slash, regardless OS?
-        return zipfile_Path(self.root, self.at + '/')
+        return zipfile.Path(self.root, self.at + '/')
 
     def rglob(self, glob: str) -> Sequence[ZipPath]:
         # note: not 100% sure about the correctness, but seem fine?
@@ -240,12 +242,22 @@ class ZipPath(zipfile_Path):
 
     @property
     def parts(self) -> Sequence[str]:
+        return self._parts
+
+    @property
+    def _parts(self) -> Sequence[str]:
+        # a bit of an implementation detail, but sometimes it's used by pathlib
         # messy, but might be ok..
         return self.filepath.parts + self.subpath.parts
 
+    @property
+    def _raw_paths(self) -> Sequence[str]:
+        # used in 3.12 for some operations
+        return self._parts
+
     def __truediv__(self, key) -> ZipPath:
         # need to implement it so the return type is not zipfile.Path
-        tmp = zipfile_Path(self.root) / self.at / key
+        tmp = zipfile.Path(self.root) / self.at / key
         return ZipPath(self.root, tmp.at)
 
     def iterdir(self) -> Iterator[ZipPath]:
@@ -292,3 +304,11 @@ class ZipPath(zipfile_Path):
             st_ctime=ts,
         )
         return os.stat_result(tuple(params.values()))
+
+    @property
+    def suffixes(self) -> List[str]:
+        return Path(self.parts[-1]).suffixes
+
+    @property
+    def suffix(self) -> str:
+        return Path(self.parts[-1]).suffix

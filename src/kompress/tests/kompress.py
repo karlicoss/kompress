@@ -1,8 +1,9 @@
 import io
+import gzip
 import lzma
 from pathlib import Path
 import zipfile
-import gzip
+import sys
 
 import pytest
 
@@ -19,8 +20,28 @@ def test_kopen(tmp_path: Path) -> None:
     assert kopen(tmp_path / 'file.xz').read() == 'compressed text'
     # fmt: on
 
-    "For zips behaviour is a bit different (not sure about all this, tbh...)"
-    assert kopen(tmp_path / 'file.zip', 'path/in/archive').read() == 'data in zip'
+
+def test_zip(tmp_path: Path) -> None:
+    # zips always contain a file inside it, so require a bit of a special handling
+    # e.g. need to pass a 'subpath' into kopen
+    subpath = 'path/in/archive'
+
+    if sys.version_info[:2] == (3, 8):
+        # seems that zippath used to return bytes in 3.8
+        assert kopen(tmp_path / 'file.zip', subpath).read() == b'data in zip'
+    else:
+        assert kopen(tmp_path / 'file.zip', subpath).read() == 'data in zip'
+
+    # CPath should dispatch zips to ZipPath
+    cpath = CPath(tmp_path / 'file.zip')
+    assert isinstance(cpath, ZipPath)
+
+    assert (cpath / subpath).read_text() == 'data in zip'
+
+    # make sure construction from parts works as expected
+    assert isinstance(CPath(*cpath.parts), ZipPath)
+
+    assert isinstance(CPath(cpath), ZipPath)
 
 
 def test_kexists(tmp_path: Path) -> None:
@@ -34,11 +55,24 @@ def test_kexists(tmp_path: Path) -> None:
     assert not kexists(tmp_path / 'nosuchzip.zip', 'path/in/archive')
 
 
-def test_cpath(tmp_path: Path) -> None:
-    # fmt: off
-    CPath(str(tmp_path / 'file'  )).read_text() == 'just plaintext'
-    CPath(    tmp_path / 'file.xz').read_text() == 'compressed text'
-    # fmt: on
+@pytest.mark.parametrize(
+    'file,expected',
+    [
+        ('file', 'just plaintext'),
+        ('file.xz', 'compressed text'),
+    ],
+)
+def test_cpath(file: str, expected: str, tmp_path: Path) -> None:
+    # check different ways of constructing the path
+    path = tmp_path / file
+    for args in [
+        [str(path)],
+        [path],
+        [CPath(path)],
+        path.parts,
+    ]:
+        Path(*args)  # type: ignore[misc] # just a sanity check that regular Path can be constructed this way
+        CPath(*args).read_text() == expected  # type: ignore[misc]
 
 
 @pytest.fixture(autouse=True)
@@ -55,11 +89,26 @@ def prepare(tmp_path: Path):
         pass
 
 
-def test_zippath() -> None:
+def test_zippath(tmp_path: Path) -> None:
+    zp = ZipPath(tmp_path / 'file.zip', 'path/in/archive')
+
+    assert zp.read_text() == 'data in zip'
+
+    if sys.version_info[:2] == (3, 8):
+        assert zp.open(mode='r').read() == b'data in zip'
+    else:
+        assert zp.open(mode='rb').read() == b'data in zip'
+
+        assert zp.open(mode='r').read() == 'data in zip'  # type: ignore[comparison-overlap]
+        # 3.8 didn't support rt
+        assert zp.open(mode='rt').read() == 'data in zip'  # type: ignore[comparison-overlap,arg-type]
+
     target = structure_data / 'gdpr_export.zip'
     assert target.exists(), target  # precondition
 
     zp = ZipPath(target)
+
+    ZipPath(zp)  # make sure it doesn't crash
 
     # magic! convenient to make third party libraries agnostic of ZipPath
     assert isinstance(zp, Path)
@@ -127,6 +176,11 @@ def test_zippath() -> None:
     # unzip -l shows the date  as 2021-07-01 09:43
     # however, python reads it as 2021-07-01 01:43 ??
     # don't really feel like dealing with this for now, it's not tz aware anyway
+
+    json_gz = zp / 'gdpr_export' / 'comments' / 'comments.json.gz'
+    assert json_gz.suffixes == ['.json', '.gz']
+    assert json_gz.suffix == '.gz'
+
 
 def test_gz(tmp_path: Path) -> None:
     gzf = tmp_path / 'file.gz'
