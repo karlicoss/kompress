@@ -195,12 +195,17 @@ class ZipPath(zipfile.Path):
     root: zipfile.ZipFile
     at: str
 
-    def __new__(cls, *args, **kwargs):
-        if len(args) == 1 and isinstance(args[0], ZipPath):
+    def __init__(self, root: Union[str, Path, zipfile.ZipFile, ZipPath], at: str = "") -> None:
+        root_: Union[str, Path, zipfile.ZipFile]
+        if isinstance(root, ZipPath):
             # hack to make sure ZipPath(ZipPath(...)) works
-            zp = args[0]
-            return zipfile.Path(zp.filepath, zp.at)
-        return super().__new__(cls)
+            root_ = root.root
+            at_ = root.at
+        else:
+            root_ = root
+            at_ = at
+
+        super().__init__(root_, at_)
 
     @property
     def filepath(self) -> Path:
