@@ -1,14 +1,13 @@
-import io
 import gzip
+import io
 import lzma
-from pathlib import Path
-import zipfile
 import sys
+import zipfile
+from pathlib import Path
 
 import pytest
 
-from .. import kopen, kexists, CPath, ZipPath
-
+from .. import CPath, ZipPath, kexists, kopen
 
 structure_data: Path = Path(__file__).parent / "structure_data"
 
@@ -56,7 +55,7 @@ def test_kexists(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    'file,expected',
+    ('file', 'expected'),
     [
         ('file', 'just plaintext'),
         ('file.xz', 'compressed text'),
@@ -72,7 +71,7 @@ def test_cpath(file: str, expected: str, tmp_path: Path) -> None:
         path.parts,
     ]:
         Path(*args)  # type: ignore[misc] # just a sanity check that regular Path can be constructed this way
-        CPath(*args).read_text() == expected  # type: ignore[misc]
+        assert CPath(*args).read_text() == expected  # type: ignore[misc]
 
 
 @pytest.fixture(autouse=True)

@@ -1,25 +1,24 @@
 from __future__ import annotations
 
-from datetime import datetime
-from functools import total_ordering
 import gzip
 import io
 import os
 import pathlib
-from pathlib import Path
 import posixpath
 import sys
 import tarfile
+import zipfile
+from datetime import datetime
+from functools import total_ordering
+from pathlib import Path
 from typing import (
+    IO,
     TYPE_CHECKING,
     Iterator,
-    IO,
     List,
     Sequence,
     Union,
 )
-import zipfile
-
 
 PathIsh = Union[Path, str]
 
@@ -40,7 +39,7 @@ def is_compressed(p: PathIsh) -> bool:
     pp = p if isinstance(p, Path) else Path(p)
     # todo kinda lame way for now.. use mime ideally?
     # should cooperate with kompress.kopen?
-    return any(pp.name.endswith(ext) for ext in {Ext.xz, Ext.zip, Ext.lz4, Ext.zstd, Ext.zst, Ext.targz, Ext.gz})
+    return pp.name.endswith((Ext.xz, Ext.zip, Ext.lz4, Ext.zstd, Ext.zst, Ext.targz, Ext.gz))
 
 
 def _zstd_open(path: Path, *args, **kwargs) -> IO:
@@ -95,7 +94,7 @@ def kopen(path: PathIsh, *args, mode: str = 'rt', **kwargs) -> IO:
         import lz4.frame  # type: ignore
 
         return lz4.frame.open(str(pp), mode, *args, **kwargs)
-    elif name.endswith(Ext.zstd) or name.endswith(Ext.zst):
+    elif name.endswith((Ext.zstd, Ext.zst)):
         kwargs['mode'] = mode
         return _zstd_open(pp, *args, **kwargs)
     elif name.endswith(Ext.targz):
@@ -178,9 +177,10 @@ open = kopen  # TODO deprecate
 def kexists(path: PathIsh, subpath: str) -> bool:
     try:
         kopen(path, subpath)
-        return True
     except Exception:
         return False
+    else:
+        return True
 
 
 @total_ordering
@@ -295,18 +295,18 @@ class ZipPath(zipfile.Path):
         # see https://en.wikipedia.org/wiki/ZIP_(file_format)#Structure
         dt = datetime(*self.root.getinfo(self.at).date_time)
         ts = int(dt.timestamp())
-        params = dict(
-            st_mode=0,
-            st_ino=0,
-            st_dev=0,
-            st_nlink=1,
-            st_uid=1000,
-            st_gid=1000,
-            st_size=0,  # todo compute it properly?
-            st_atime=ts,
-            st_mtime=ts,
-            st_ctime=ts,
-        )
+        params = {
+            'st_mode': 0,
+            'st_ino': 0,
+            'st_dev': 0,
+            'st_nlink': 1,
+            'st_uid': 1000,
+            'st_gid': 1000,
+            'st_size': 0,  # todo compute it properly?
+            'st_atime': ts,
+            'st_mtime': ts,
+            'st_ctime': ts,
+        }
         return os.stat_result(tuple(params.values()))
 
     @property
