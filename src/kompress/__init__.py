@@ -1,5 +1,3 @@
-# TODO add a note that these were in HPI originally?
-
 from __future__ import annotations
 
 from datetime import datetime
@@ -192,7 +190,7 @@ class ZipPath(zipfile.Path):
     _flavour = posixpath  # this is necessary for some pathlib operations (in particular python 3.12)
 
     # seems that root/at are not exposed in the docs, so might be an implementation detail
-    root: zipfile.ZipFile
+    root: zipfile.CompleteDirs
     at: str
 
     def __init__(self, root: Union[str, Path, zipfile.ZipFile, ZipPath], at: str = "") -> None:
@@ -234,16 +232,17 @@ class ZipPath(zipfile.Path):
         # note: seems that zip always uses forward slash, regardless OS?
         return zipfile.Path(self.root, self.at + '/')
 
-    def rglob(self, glob: str) -> Sequence[ZipPath]:
+    def rglob(self, glob: str) -> Iterator[ZipPath]:
         # note: not 100% sure about the correctness, but seem fine?
         # Path.match() matches from the right, so need to
-        rpaths = [p for p in self.root.namelist() if p.startswith(self.at)]
-        rpaths = [p for p in rpaths if Path(p).match(glob)]
-        return [ZipPath(self.root, p) for p in rpaths]
+        rpaths = (p for p in self.root.namelist() if p.startswith(self.at))
+        rpaths = (p for p in rpaths if Path(p).match(glob))
+        return (ZipPath(self.root, p) for p in rpaths)
 
-    def relative_to(self, other: ZipPath) -> Path:
+    # TODO remove unused-ignore after 3.8
+    def relative_to(self, other: ZipPath, *extra: Union[str, os.PathLike[str]]) -> Path:  # type: ignore[override,unused-ignore]
         assert self.filepath == other.filepath, (self.filepath, other.filepath)
-        return self.subpath.relative_to(other.subpath)
+        return self.subpath.relative_to(other.subpath, *extra)
 
     @property
     def parts(self) -> Sequence[str]:
