@@ -99,9 +99,9 @@ def test_zippath(tmp_path: Path) -> None:
     else:
         assert zp.open(mode='rb').read() == b'data in zip'
 
-        assert zp.open(mode='r').read() == 'data in zip'  # type: ignore[comparison-overlap]
+        assert zp.open(mode='r').read() == 'data in zip'
         # 3.8 didn't support rt
-        assert zp.open(mode='rt').read() == 'data in zip'  # type: ignore[comparison-overlap,arg-type]
+        assert zp.open(mode='rt').read() == 'data in zip'  # type: ignore[call-overload]
 
     target = structure_data / 'gdpr_export.zip'
     assert target.exists(), target  # precondition
