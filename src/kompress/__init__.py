@@ -20,6 +20,8 @@ from typing import (
     Union,
 )
 
+from ._zippath import _walk_paths
+
 PathIsh = Union[Path, str]
 
 
@@ -227,6 +229,9 @@ class ZipPath(zipfile.Path):
             # special case, the base class returns False in this case for some reason
             return self.filepath.exists()
         return super().exists() or self._as_dir().exists()
+        # TODO hmm seems that base class has special treatment for .at argument during construction,
+        # it actually checks if it's a file or a dir, and in case of dir, appends '/'?
+        # maybe use resolve_dir thing from base class??
 
     def _as_dir(self) -> zipfile.Path:
         # note: seems that zip always uses forward slash, regardless OS?
@@ -316,3 +321,30 @@ class ZipPath(zipfile.Path):
     @property
     def suffix(self) -> str:
         return Path(self.parts[-1]).suffix
+
+    def walk(
+        self,
+        *,
+        top_down: bool = True,
+        on_error=None,
+        follow_symlinks: bool = False,
+    ) -> Iterator[tuple[ZipPath, list[str], list[str]]]:
+        assert top_down, "specifying top_down isn't supported for zipfile.Path yet"
+        assert on_error is None, "on_error isn't supported for zipfile.Path yet"
+
+        at = self.at
+        names = []
+        for n in self.root.namelist():
+            if not n.startswith(at):
+                continue
+            rest = n[len(at) :]
+            if rest != '':
+                # no need to append the subdir itself?
+                names.append(rest)
+        names.sort()
+
+        # note: seems that zip always uses forward slash, regardless OS?
+        for r, dirs, files in _walk_paths(names, separator='/'):
+            # make sure we don't construct ZipPath with at='.'... this behaves weird
+            rr = self if r == '.' else self / r
+            yield rr, dirs, files

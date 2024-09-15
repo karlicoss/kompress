@@ -118,12 +118,22 @@ def test_zippath(tmp_path: Path) -> None:
 
     assert ZipPath(target) == ZipPath(target)
     assert zp.absolute() == zp
+    assert zp / '.' == zp
 
     # shouldn't crash
     hash(zp)
 
     assert zp.exists()
+    assert (zp / 'gdpr_export').exists()
     assert (zp / 'gdpr_export' / 'comments').exists()
+    ## NOTE: in pathlib.Path these work, however not in zipfile.Path
+    ## for now we don't support them either, need to be really careful if we wanna diverge from zipfile.Path
+    ## but in
+    # assert (zp / '.').exists()
+    # assert (zp / '.' / 'gdpr_export').exists()
+    # assert (zp / 'gdpr_export' / './comments').exists()
+    ##
+
     # check str constructor just in case
     assert (ZipPath(str(target)) / 'gdpr_export' / 'comments').exists()
     assert not (ZipPath(str(target)) / 'whatever').exists()
