@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import io
+import os
+import pathlib
 import sys
 import tarfile
 from dataclasses import dataclass
@@ -10,7 +12,6 @@ from typing import Dict, Generator, Optional, Union
 
 from typing_extensions import Self
 
-from .common import BasePath
 from .utils import walk_paths
 
 maybe_slots = {'slots': True} if sys.version_info[:2] >= (3, 10) else {}
@@ -26,8 +27,12 @@ class Node:
         return self.info.name.rsplit('/', maxsplit=1)[-1]
 
 
-# we want to inherit BasePath since it provides a bunch of methods which are quite useful..
-class TarPath(BasePath):
+class TarPath(Path):
+
+    if sys.version_info[:2] < (3, 12):
+        # older version of python need _flavour defined
+        _flavour = pathlib._windows_flavour if os.name == 'nt' else pathlib._posix_flavour  # type: ignore[attr-defined]
+
     def __new__(cls, tar: Union[str, Path, TarPath, TarFile], *, node: Optional[Node] = None) -> Self:
         if isinstance(tar, TarPath):
             # make sure TarPath(TarPath(...)) works
