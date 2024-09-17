@@ -20,7 +20,9 @@ from typing import (
     Union,
 )
 
-from ._zippath import _walk_paths
+from .common import BasePath
+from .tar import TarPath
+from .utils import walk_paths
 
 PathIsh = Union[Path, str]
 
@@ -100,7 +102,8 @@ def kopen(path: PathIsh, *args, mode: str = 'rt', **kwargs) -> IO:
         kwargs['mode'] = mode
         return _zstd_open(pp, *args, **kwargs)
     elif name.endswith(Ext.targz):
-        # FIXME pass mode?
+        # TODO don't think .tar.gz can be just a raw file? I think it's always sort of a directory (possibly with a single file)
+        # TODO pass mode?
         tf = tarfile.open(pp)
         # TODO pass encoding?
         x = tf.extractfile(*args)
@@ -130,13 +133,6 @@ def kopen(path: PathIsh, *args, mode: str = 'rt', **kwargs) -> IO:
         return pp.open(mode, *args, **kwargs)
 
 
-if TYPE_CHECKING:
-    # otherwise mypy can't figure out that BasePath is a type alias..
-    BasePath = pathlib.Path
-else:
-    BasePath = pathlib.WindowsPath if os.name == 'nt' else pathlib.PosixPath
-
-
 class CPath(BasePath):
     """
     Hacky way to support compressed files.
@@ -156,6 +152,8 @@ class CPath(BasePath):
             # This way it's a bit more explicit.
             # possibly useful for tar.gz as well?
             return ZipPath(path)
+        elif path.name.endswith(Ext.targz):  # TODO add support for kopen too? should really make it private
+            return TarPath(path)
         return super().__new__(cls, *args, **kwargs)
 
     def open(self, *args, **kwargs):
@@ -344,7 +342,7 @@ class ZipPath(zipfile.Path):
         names.sort()
 
         # note: seems that zip always uses forward slash, regardless OS?
-        for r, dirs, files in _walk_paths(names, separator='/'):
+        for r, dirs, files in walk_paths(names, separator='/'):
             # make sure we don't construct ZipPath with at='.'... this behaves weird
             rr = self if r == '.' else self / r
             yield rr, dirs, files
