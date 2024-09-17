@@ -26,13 +26,19 @@ class Node:
         return self.info.name.rsplit('/', maxsplit=1)[-1]
 
 
+# we want to inherit BasePath since it provides a bunch of methods which are quite useful..
 class TarPath(BasePath):
     def __new__(cls, tar: Union[str, Path, TarPath, TarFile], *, node: Optional[Node] = None) -> Self:
         if isinstance(tar, TarPath):
             # make sure TarPath(TarPath(...)) works
             return cls(tar=tar.tar, node=tar._node)
         elif isinstance(tar, TarFile):
-            res = super().__new__(cls)
+            pp = Path(tar.name)  # type: ignore[arg-type]
+            if node is not None:
+                pp = pp / Path(node.info.name)
+            # ugh. it works without passing these in 3.12, but not before??
+            # seems like it sets parts in constructor.. or smth like that
+            res = super().__new__(cls, pp)
             return res
         else:
             return cls._make(tar)
