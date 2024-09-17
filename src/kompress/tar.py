@@ -27,57 +27,80 @@ class Node:
         return self.info.name.rsplit('/', maxsplit=1)[-1]
 
 
+Nodes = Dict[str, Node]
+
+
+def _tarpath(tf: TarFile) -> Path:
+    path = tf.name
+    assert path is not None
+    path = os.fspath(path)  # convert PathLike objects into str | bytes
+    if isinstance(path, bytes):
+        path = path.decode()
+    return Path(path)
+
+
 class TarPath(Path):
 
     if sys.version_info[:2] < (3, 12):
         # older version of python need _flavour defined
         _flavour = pathlib._windows_flavour if os.name == 'nt' else pathlib._posix_flavour  # type: ignore[attr-defined]
 
-    def __new__(cls, tar: Union[str, Path, TarPath, TarFile], *, node: Optional[Node] = None) -> Self:
+    def __new__(
+        cls,
+        tar: Union[str, Path, TarPath, TarFile],
+        *,
+        _nodes: Optional[Nodes] = None,
+        _rpath: Optional[Path] = None,
+        _node: Optional[Node] = None,
+    ) -> Self:
         if isinstance(tar, TarPath):
             # make sure TarPath(TarPath(...)) works
-            assert node is None, node  # just in case
+            assert _node is None, _node  # just in case
             return tar  # type: ignore[return-value]  # hmm doesn't like Self for some reason??
 
         if isinstance(tar, TarFile):
-            # primary constructor, taking in Tarfile + Node
-            path = Path(tar.name)  # type: ignore[arg-type]
-            if node is not None:
-                path = path / Path(node.info.name)
+            # primary constructor, taking in Tarfile + relative Path
+            assert _rpath is not None
+            path = _tarpath(tar) / _rpath
             res = super().__new__(cls, path)
             return res  # delegate to __init__
 
-        # otherwise it's str | Path -- need to build a new TarFile + Node for it
-        assert node is None, node  # just in case
+        # otherwise it's str | Path -- need to build a new TarFile + Node for it XX
+        assert _node is None, _node  # just in case
         path = Path(tar)
-        tar, node = TarPath._make_args(path)
-        return cls(tar=tar, node=node)
+        tar, nodes, root = TarPath._make_args(path)
+        return cls(tar=tar, _nodes=nodes, _node=root, _rpath=Path('.'))
 
-    def __init__(self, tar: Union[str, Path, TarPath, TarFile], *, node: Optional[Node] = None) -> None:
+    def __init__(
+        self,
+        tar: Union[str, Path, TarPath, TarFile],
+        *,
+        _nodes: Optional[Nodes] = None,
+        _rpath: Optional[Path] = None,
+        _node: Optional[Node] = None,
+    ) -> None:
         if hasattr(self, 'tar'):
             # already initialized via __new__
             return
         assert isinstance(tar, TarFile), tar  # make mypy happy. the other options are for __new__
-        path = Path(tar.name)  # type: ignore[arg-type]
-        if node is not None:
-            path = path / Path(node.info.name)
+        assert _nodes is not None
+        assert _rpath is not None
 
         if sys.version_info[:2] >= (3, 12):
             # in older version of python Path didn't have __init__, so this just calls object.__init__
+            path = _tarpath(tar) / _rpath
             super().__init__(path)
 
         self.tar = tar
-        self._node = node
+        self._nodes = _nodes
+        self._rpath = _rpath
+        self._node = _node if _node is not None else _nodes.get(str(_rpath))
 
     @property
     def node(self) -> Node:
         n = self._node
-        assert n is not None, "path doesn't exist"  # TODO kinda crap we can't report which path is that...
+        assert n is not None, f"path {self} doesn't exist"
         return n
-
-    @property
-    def name(self) -> str:
-        return self.node.name
 
     def is_file(self) -> bool:
         return self.node.info.isfile()
@@ -93,20 +116,16 @@ class TarPath(Path):
         assert node.info.isdir()
 
         for entry in node.children:
-            yield TarPath(tar=self.tar, node=entry)
+            rpath = self._rpath / entry.name
+            yield TarPath(tar=self.tar, _nodes=self._nodes, _rpath=rpath, _node=entry)
 
     def __repr__(self) -> str:
         return f'{self.tar=} {self._node=}'
 
     def __truediv__(self, other) -> TarPath:
-        assert '/' not in other  # TODO handle later
-        # TODO normalise path maybe? not sure what if it contains double dots
-
-        for c in self.node.children:
-            # TODO it should probs track relative paths inside archive?
-            if c.name == other:
-                return TarPath(tar=self.tar, node=c)
-        return TarPath(tar=self.tar, node=None)
+        # TODO normalise it?
+        new_rpath = self._rpath / other
+        return TarPath(tar=self.tar, _nodes=self._nodes, _rpath=new_rpath, _node=None)
 
     def open(self, mode: str = 'r', **kwargs):  # type: ignore[override]
         extracted = self.tar.extractfile(self.node.info)
@@ -115,15 +134,8 @@ class TarPath(Path):
         else:
             return io.TextIOWrapper(extracted, encoding=kwargs.get('encoding'))  # type: ignore[arg-type]
 
-    @property
-    def _parts_impl(self) -> tuple[str, ...]:
-        # a bit of an implementation detail, but sometimes it's used by pathlib
-        # messy, but might be ok..
-        tar_path = Path(self.tar.name)  # type: ignore[arg-type]
-        return tar_path.parts + Path(self.node.info.name).parts
-
     @staticmethod
-    def _make_args(path: Path) -> tuple[TarFile, Optional[Node]]:
+    def _make_args(path: Path) -> tuple[TarFile, Nodes, Node]:
         tf = tarfile.open(path, 'r')
 
         members = tf.getmembers()
@@ -160,7 +172,7 @@ class TarPath(Path):
                 pnode.children.append(cnode)
 
         root_node = nodes['.']  # meh
-        return (tf, root_node)
+        return (tf, nodes, root_node)
 
 
 # TODO unify tests with zippath?
@@ -188,6 +200,7 @@ def test_tar_dir(tmp_path: Path) -> None:
 
     [subdir] = tar.iterdir()
 
+    assert isinstance(subdir, TarPath)
     assert isinstance(subdir, Path)
 
     hash(subdir)  # shouldn't crash
@@ -197,12 +210,16 @@ def test_tar_dir(tmp_path: Path) -> None:
     assert subdir != tar
     ##
 
+    parent = subdir.parent
+    assert isinstance(parent, TarPath)
+    assert parent == tar
+
     assert subdir.name == 'gdpr_export'
     assert str(subdir) == str(target / 'gdpr_export')
     assert tar.is_dir()  # TODO not sure about this.. maybe it should return both is_file and is_dir?
 
     whatever = subdir / 'whatever'
-    # assert whatever.name == 'whatever'
+    assert whatever.name == 'whatever'
     assert not whatever.exists()
 
     messages = subdir / 'messages'
