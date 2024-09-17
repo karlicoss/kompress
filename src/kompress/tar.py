@@ -8,7 +8,7 @@ import tarfile
 from dataclasses import dataclass
 from pathlib import Path
 from tarfile import TarFile, TarInfo
-from typing import Dict, Generator, Optional, Union
+from typing import Dict, Generator
 
 from typing_extensions import Self
 
@@ -47,11 +47,11 @@ class TarPath(Path):
 
     def __new__(
         cls,
-        tar: Union[str, Path, TarPath, TarFile],
+        tar: str | Path | TarPath | TarFile,
         *,
-        _nodes: Optional[Nodes] = None,
-        _rpath: Optional[Path] = None,
-        _node: Optional[Node] = None,
+        _nodes: Nodes | None = None,
+        _rpath: Path | None = None,
+        _node: Node | None = None,
     ) -> Self:
         if isinstance(tar, TarPath):
             # make sure TarPath(TarPath(...)) works
@@ -68,16 +68,22 @@ class TarPath(Path):
         # otherwise it's str | Path -- need to build a new TarFile + Node for it XX
         assert _node is None, _node  # just in case
         path = Path(tar)
+
+        if not path.exists():
+            # if it doesn't exist, tarpath can't open it...
+            # so it's the best we can do is just return a regular path
+            return path  # type: ignore[return-value]
+
         tar, nodes, root = TarPath._make_args(path)
-        return cls(tar=tar, _nodes=nodes, _node=root, _rpath=Path('.'))
+        return cls(tar=tar, _nodes=nodes, _node=root, _rpath=Path())
 
     def __init__(
         self,
-        tar: Union[str, Path, TarPath, TarFile],
+        tar: str | Path | TarPath | TarFile,
         *,
-        _nodes: Optional[Nodes] = None,
-        _rpath: Optional[Path] = None,
-        _node: Optional[Node] = None,
+        _nodes: Nodes | None = None,
+        _rpath: Path | None = None,
+        _node: Node | None = None,
     ) -> None:
         if hasattr(self, 'tar'):
             # already initialized via __new__
@@ -109,7 +115,7 @@ class TarPath(Path):
     def is_dir(self) -> bool:
         return self.node.info.isdir()
 
-    def exists(self, **kwargs) -> bool:
+    def exists(self, **kwargs) -> bool:  # noqa: ARG002
         return self._node is not None  # meh
 
     def iterdir(self) -> Generator[TarPath, None, None]:
@@ -150,7 +156,7 @@ class TarPath(Path):
             paths.append(p)
             infos[m.name] = m
 
-        nodes: Dict[str, Node] = {}
+        nodes: dict[str, Node] = {}
 
         def get_node(p: str) -> Node:
             node = nodes.get(p)
@@ -181,6 +187,9 @@ class TarPath(Path):
 # TODO unify tests with zippath?
 def test_tar_dir(tmp_path: Path) -> None:
     from . import CPath  # avoid circular import
+
+    nonexistent = CPath(tmp_path / 'donotexist.tar.gz')
+    assert not nonexistent.exists()
 
     structure_data: Path = Path(__file__).parent / 'tests/structure_data'
     target = structure_data / 'gdpr_export.tar.gz'
