@@ -56,7 +56,11 @@ class TarPath(BasePath):
         path = Path(tar.name)  # type: ignore[arg-type]
         if node is not None:
             path = path / Path(node.info.name)
-        super().__init__(path)
+
+        if sys.version_info[:2] >= (3, 12):
+            # in older version of python Path didn't have __init__, so this just calls object.__init__
+            super().__init__(path)
+
         self.tar = tar
         self._node = node
 
