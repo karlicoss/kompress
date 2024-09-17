@@ -143,7 +143,7 @@ class TarPath(Path):
         infos = {}
         for m in members:
             is_dir = m.isdir()
-            p = m.name + ('/' if is_dir else '')
+            p = m.name + (os.sep if is_dir else '')
             paths.append(p)
             infos[m.name] = m
 
@@ -164,8 +164,8 @@ class TarPath(Path):
                 nodes[p] = node
             return node
 
-        for r, dirs, files in walk_paths(paths, separator='/'):
-            p = f'{r}/' if r != '.' else ''
+        for r, dirs, files in walk_paths(paths, separator=os.sep):
+            p = f'{r}{os.sep}' if r != '.' else ''
             pnode = get_node(r)
             for x in dirs + files:
                 cnode = get_node(f'{p}{x}')
