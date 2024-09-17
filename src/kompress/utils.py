@@ -14,7 +14,7 @@ FileName = str
 Entry = Tuple[RootName, List[Tuple[DirName, 'Entry']], List[FileName]]
 
 
-def _walk_paths(
+def walk_paths(
     paths: Iterable[str],
     separator: str,
 ) -> Iterator[tuple[RootName, list[DirName], list[FileName]]]:
@@ -78,17 +78,17 @@ def _walk_paths(
 
 def test_walk_paths_basic() -> None:
     # not sure about this one but this is kinda compatible with pathlib.Path.glob behaviour
-    assert list(_walk_paths([], separator=os.sep)) == [
+    assert list(walk_paths([], separator=os.sep)) == [
         ('.', [], []),
     ]
 
     # just two files with no extra dirs
-    assert list(_walk_paths(['aaa', 'bbb'], separator=os.sep)) == [
+    assert list(walk_paths(['aaa', 'bbb'], separator=os.sep)) == [
         ('.', [], ['aaa', 'bbb']),
     ]
 
     # one empty dir
-    assert list(_walk_paths(['aaa/'], separator='/')) == [
+    assert list(walk_paths(['aaa/'], separator='/')) == [
         # fmt: off
         ('.'  , ['aaa'], []),
         ('aaa', []     , []),
@@ -96,7 +96,7 @@ def test_walk_paths_basic() -> None:
     ]
 
     # dir with one dir with one file
-    assert list(_walk_paths(['aaa/', 'aaa/bbb/', 'aaa/bbb/fff'], separator='/')) == [
+    assert list(walk_paths(['aaa/', 'aaa/bbb/', 'aaa/bbb/fff'], separator='/')) == [
         # fmt: off
         ('.'      , ['aaa'], []),
         ('aaa'    , ['bbb'], []),
@@ -130,7 +130,7 @@ def test_walk_paths_against_stdlib() -> None:
         assert len(expected) > 1  # just in case
 
         paths = sorted(as_paths(root))
-        actual = list(_walk_paths(paths, separator=os.sep))
+        actual = list(walk_paths(paths, separator=os.sep))
 
         assert expected == actual
 
