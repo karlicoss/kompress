@@ -7,29 +7,19 @@ from pathlib import Path
 
 import pytest
 
-from .. import CPath, ZipPath, kexists, kopen
+from .. import CPath, ZipPath
 
 structure_data: Path = Path(__file__).parent / "structure_data"
 
 
-def test_kopen(tmp_path: Path) -> None:
-    "Plaintext handled transparently"
-    # fmt: off
-    assert kopen(tmp_path / 'file'   ).read() == 'just plaintext'
-    assert kopen(tmp_path / 'file.xz').read() == 'compressed text'
-    # fmt: on
-
-
 def test_zip(tmp_path: Path) -> None:
-    # zips always contain a file inside it, so require a bit of a special handling
-    # e.g. need to pass a 'subpath' into kopen
     subpath = 'path/in/archive'
 
     if sys.version_info[:2] == (3, 8):
         # seems that zippath used to return bytes in 3.8
-        assert kopen(tmp_path / 'file.zip', subpath).read() == b'data in zip'
+        assert (CPath(tmp_path / 'file.zip') / subpath).open().read() == b'data in zip'
     else:
-        assert kopen(tmp_path / 'file.zip', subpath).read() == 'data in zip'
+        assert (CPath(tmp_path / 'file.zip') / subpath).open().read() == 'data in zip'
 
     # CPath should dispatch zips to ZipPath
     cpath = CPath(tmp_path / 'file.zip')
@@ -43,27 +33,28 @@ def test_zip(tmp_path: Path) -> None:
     assert isinstance(CPath(cpath), ZipPath)
 
 
-def test_kexists(tmp_path: Path) -> None:
-    # TODO also test top level?
-    # fmt: off
-    assert     kexists(str(tmp_path / 'file.zip'), 'path/in/archive')
-    assert not kexists(str(tmp_path / 'file.zip'), 'path/notin/archive')
-    # fmt: on
+def test_cpath_zip(tmp_path: Path) -> None:
+    assert (CPath(tmp_path / 'file.zip') / 'path/in/archive').exists()
+    assert not (CPath(tmp_path / 'file.zip') / 'path/notin/archive').exists()
 
-    # TODO not sure about this?
-    assert not kexists(tmp_path / 'nosuchzip.zip', 'path/in/archive')
+    assert not (CPath(tmp_path / 'nosuchzip.zip') / 'path/in/archive').exists()
 
 
 @pytest.mark.parametrize(
-    ('file', 'expected'),
+    ('filename', 'expected'),
     [
         ('file', 'just plaintext'),
         ('file.xz', 'compressed text'),
     ],
 )
-def test_cpath(file: str, expected: str, tmp_path: Path) -> None:
-    # check different ways of constructing the path
-    path = tmp_path / file
+def test_cpath_regular(filename: str, expected: str, tmp_path: Path) -> None:
+    """
+    Check different ways of interacting with CPath
+    """
+    path = tmp_path / filename
+
+    assert CPath(path).open().read() == expected
+
     for args in [
         [str(path)],
         [path],
@@ -74,21 +65,10 @@ def test_cpath(file: str, expected: str, tmp_path: Path) -> None:
         assert CPath(*args).read_text() == expected  # type: ignore[misc]
 
 
-@pytest.fixture(autouse=True)
-def prepare(tmp_path: Path):
-    (tmp_path / 'file').write_text('just plaintext')
-    with (tmp_path / 'file.xz').open('wb') as f:
-        with lzma.open(f, 'w') as lzf:
-            lzf.write(b'compressed text')
-    with zipfile.ZipFile(tmp_path / 'file.zip', 'w') as zf:
-        zf.writestr('path/in/archive', 'data in zip')
-    try:
-        yield None
-    finally:
-        pass
-
-
 def test_zippath(tmp_path: Path) -> None:
+    # TODO support later...
+    # zz = ZipPath(tmp_path / 'doesntexist.zip')
+
     zp = ZipPath(tmp_path / 'file.zip', 'path/in/archive')
 
     assert zp.read_text() == 'data in zip'
@@ -126,6 +106,7 @@ def test_zippath(tmp_path: Path) -> None:
     assert zp.exists()
     assert (zp / 'gdpr_export').exists()
     assert (zp / 'gdpr_export' / 'comments').exists()
+    assert (zp / Path('gdpr_export', 'comments')).exists()
     ## NOTE: in pathlib.Path these work, however not in zipfile.Path
     ## for now we don't support them either, need to be really careful if we wanna diverge from zipfile.Path
     ## but in
@@ -199,14 +180,14 @@ def test_gz(tmp_path: Path) -> None:
     # test against gzip magic number
     assert gzf.read_bytes()[:2] == b'\x1f\x8b'
 
-    with kopen(gzf) as f:
+    with CPath(gzf).open() as f:
         assert hasattr(f, 'read')
         assert hasattr(f, 'readable')
         assert f.readable()
         assert not f.writable()
         assert f.read() == 'compressed text'  # if not specified, defaults to rt
 
-    with kopen(gzf, mode='rb') as f:
+    with CPath(gzf).open(mode='rb') as f:
         assert isinstance(f, gzip.GzipFile)
         assert f.read() == b'compressed text'
 
@@ -222,3 +203,35 @@ def test_gz(tmp_path: Path) -> None:
 
     assert CPath(gzf).read_text() == 'compressed text'
     assert CPath(gzf).read_bytes() == b'compressed text'
+
+
+def test_kopen_kexists(tmp_path: Path) -> None:
+    """
+    Testing deprecations, can remove when we remove kexists/kopen
+    """
+    from .. import kexists, kopen  # type: ignore[attr-defined]
+
+    path = Path(tmp_path / 'file.zip')
+
+    read_res = kopen(path, 'path', 'in', 'archive').read()
+    if sys.version_info[:2] == (3, 8):
+        # seems that zippath used to return bytes in 3.8
+        assert read_res == b'data in zip'
+    else:
+        assert read_res == 'data in zip'
+    assert kexists(path, 'path/in/archive')
+    assert not kexists(path, 'does/not/exist')
+
+
+@pytest.fixture(autouse=True)
+def prepare_data(tmp_path: Path):
+    (tmp_path / 'file').write_text('just plaintext')
+    with (tmp_path / 'file.xz').open('wb') as f:
+        with lzma.open(f, 'w') as lzf:
+            lzf.write(b'compressed text')
+    with zipfile.ZipFile(tmp_path / 'file.zip', 'w') as zf:
+        zf.writestr('path/in/archive', 'data in zip')
+    try:
+        yield None
+    finally:
+        pass
