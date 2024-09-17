@@ -94,7 +94,8 @@ class TarPath(Path):
         self.tar = tar
         self._nodes = _nodes
         self._rpath = _rpath
-        self._node = _node if _node is not None else _nodes.get(str(_rpath))
+        # note: / always used in index (even on windows) since that's what tar archives use
+        self._node = _node if _node is not None else _nodes.get('/'.join(_rpath.parts))
 
     @property
     def node(self) -> Node:
@@ -120,7 +121,7 @@ class TarPath(Path):
             yield TarPath(tar=self.tar, _nodes=self._nodes, _rpath=rpath, _node=entry)
 
     def __repr__(self) -> str:
-        return f'{self.tar=} {self._node=}'
+        return f'{self.tar=} {self._rpath=} {self._node=}'
 
     def __truediv__(self, other) -> TarPath:
         # TODO normalise it?
@@ -138,12 +139,14 @@ class TarPath(Path):
     def _make_args(path: Path) -> tuple[TarFile, Nodes, Node]:
         tf = tarfile.open(path, 'r')
 
+        sep = '/'  # note: doesn't really matter which separator is used here, this is just within this function
+
         members = tf.getmembers()
         paths = []
         infos = {}
         for m in members:
             is_dir = m.isdir()
-            p = m.name + (os.sep if is_dir else '')
+            p = m.name + (sep if is_dir else '')
             paths.append(p)
             infos[m.name] = m
 
@@ -164,8 +167,8 @@ class TarPath(Path):
                 nodes[p] = node
             return node
 
-        for r, dirs, files in walk_paths(paths, separator=os.sep):
-            p = f'{r}{os.sep}' if r != '.' else ''
+        for r, dirs, files in walk_paths(paths, separator=sep):
+            p = f'{r}{sep}' if r != '.' else ''
             pnode = get_node(r)
             for x in dirs + files:
                 cnode = get_node(f'{p}{x}')
