@@ -31,23 +31,32 @@ class TarPath(BasePath):
     def __new__(cls, tar: Union[str, Path, TarPath, TarFile], *, node: Optional[Node] = None) -> Self:
         if isinstance(tar, TarPath):
             # make sure TarPath(TarPath(...)) works
-            return cls(tar=tar.tar, node=tar._node)
-        elif isinstance(tar, TarFile):
-            pp = Path(tar.name)  # type: ignore[arg-type]
+            assert node is None, node  # just in case
+            return tar  # type: ignore[return-value]  # hmm doesn't like Self for some reason??
+
+        if isinstance(tar, TarFile):
+            # primary constructor, taking in Tarfile + Node
+            path = Path(tar.name)  # type: ignore[arg-type]
             if node is not None:
-                pp = pp / Path(node.info.name)
-            # ugh. it works without passing these in 3.12, but not before??
-            # seems like it sets parts in constructor.. or smth like that
-            res = super().__new__(cls, pp)
-            return res
-        else:
-            return cls._make(tar)
+                path = path / Path(node.info.name)
+            res = super().__new__(cls, path)
+            return res  # delegate to __init__
+
+        # otherwise it's str | Path -- need to build a new TarFile + Node for it
+        assert node is None, node  # just in case
+        path = Path(tar)
+        tar, node = TarPath._make_args(path)
+        return cls(tar=tar, node=node)
 
     def __init__(self, tar: Union[str, Path, TarPath, TarFile], *, node: Optional[Node] = None) -> None:
         if hasattr(self, 'tar'):
-            # ugh. already initialised in __new__???
+            # already initialized via __new__
             return
-        assert isinstance(tar, TarFile), tar
+        assert isinstance(tar, TarFile), tar  # make mypy happy. the other options are for __new__
+        path = Path(tar.name)  # type: ignore[arg-type]
+        if node is not None:
+            path = path / Path(node.info.name)
+        super().__init__(path)
         self.tar = tar
         self._node = node
 
@@ -85,6 +94,7 @@ class TarPath(BasePath):
         # TODO normalise path maybe? not sure what if it contains double dots
 
         for c in self.node.children:
+            # TODO it should probs track relative paths inside archive?
             if c.name == other:
                 return TarPath(tar=self.tar, node=c)
         return TarPath(tar=self.tar, node=None)
@@ -97,29 +107,14 @@ class TarPath(BasePath):
             return io.TextIOWrapper(extracted, encoding=kwargs.get('encoding'))  # type: ignore[arg-type]
 
     @property
-    def parts(self) -> tuple[str, ...]:
-        return self._parts_impl
-
-    @property
-    def _raw_paths(self) -> tuple[str, ...]:
-        # used in 3.12 for some operations
-        return self._parts_impl
-
-    @property
     def _parts_impl(self) -> tuple[str, ...]:
         # a bit of an implementation detail, but sometimes it's used by pathlib
         # messy, but might be ok..
         tar_path = Path(self.tar.name)  # type: ignore[arg-type]
         return tar_path.parts + Path(self.node.info.name).parts
 
-    if sys.version_info[:2] >= (3, 12):
-        # before 3.12 it's trying to set it in base class?
-        @property
-        def _parts(self) -> tuple[str, ...]:
-            return self._parts_impl
-
-    @classmethod
-    def _make(cls, path: Union[Path, str]) -> Self:
+    @staticmethod
+    def _make_args(path: Path) -> tuple[TarFile, Optional[Node]]:
         tf = tarfile.open(path, 'r')
 
         members = tf.getmembers()
@@ -156,8 +151,7 @@ class TarPath(BasePath):
                 pnode.children.append(cnode)
 
         root_node = nodes['.']  # meh
-        res = cls(tar=tf, node=root_node)
-        return res
+        return (tf, root_node)
 
 
 # TODO unify tests with zippath?
@@ -172,6 +166,7 @@ def test_tar_dir(tmp_path: Path) -> None:
     assert not isinstance(target, TarPath)  # just in case
 
     tar: Path = CPath(target)
+    assert isinstance(tar, TarPath)
 
     tar = TarPath(tar)  # should support double wrappping
     assert isinstance(tar, TarPath)
@@ -198,10 +193,13 @@ def test_tar_dir(tmp_path: Path) -> None:
     assert tar.is_dir()  # TODO not sure about this.. maybe it should return both is_file and is_dir?
 
     whatever = subdir / 'whatever'
+    # assert whatever.name == 'whatever'
     assert not whatever.exists()
 
     messages = subdir / 'messages'
     assert messages.is_dir()
+
+    assert messages.parts == (*target.parts, 'gdpr_export', 'messages')
 
     assert messages < subdir / 'profile'  # supports ordering
 
