@@ -63,6 +63,8 @@ class CPath(Path):
         _flavour = pathlib._windows_flavour if os.name == 'nt' else pathlib._posix_flavour  # type: ignore[attr-defined]
 
     def __new__(cls, *args, **kwargs):
+        # TODO shortcut if args[0] is already Cpath?
+
         path = Path(*args)
         if path.name.endswith(Ext.zip):
             if path.exists():
