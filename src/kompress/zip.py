@@ -126,7 +126,18 @@ class ZipPath(zipfile.Path):
     def stat(self) -> os.stat_result:
         # NOTE: zip datetimes have no notion of time zone, usually they just keep local time?
         # see https://en.wikipedia.org/wiki/ZIP_(file_format)#Structure
-        dt = datetime(*self.root.getinfo(self.at).date_time)
+        info = self.root.getinfo(self.at)
+        date_time = info.date_time
+        if date_time[0] == 1980:
+            # This is the min/default date in zip (or at least in python wrapper)
+            # Most likely this means that the zip doesn't contain actual datetime info in "central directory"
+            #  , but instead uses some OS extension ("Extended Timestamp"?)
+            # In particular, that started happening to google takeouts sinse Feb 2024
+            # Doesn't look like these are supported for python at the moment, see https://github.com/python/cpython/issues/49707
+            # So the best we can do in that case (which still might be wrong is taking the file's stats instead :( )
+            return self.filepath.stat()
+
+        dt = datetime(*info.date_time)
         ts = int(dt.timestamp())
         params = {
             'st_mode': 0,
