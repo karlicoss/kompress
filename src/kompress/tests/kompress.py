@@ -1,7 +1,6 @@
 import gzip
 import io
 import lzma
-import sys
 import zipfile
 from pathlib import Path
 
@@ -15,11 +14,7 @@ structure_data: Path = Path(__file__).parent / "structure_data"
 def test_zip(tmp_path: Path) -> None:
     subpath = 'path/in/archive'
 
-    if sys.version_info[:2] == (3, 8):
-        # seems that zippath used to return bytes in 3.8
-        assert (CPath(tmp_path / 'file.zip') / subpath).open().read() == b'data in zip'
-    else:
-        assert (CPath(tmp_path / 'file.zip') / subpath).open().read() == 'data in zip'
+    assert (CPath(tmp_path / 'file.zip') / subpath).open().read() == 'data in zip'
 
     # CPath should dispatch zips to ZipPath
     cpath = CPath(tmp_path / 'file.zip')
@@ -53,7 +48,8 @@ def test_cpath_regular(filename: str, expected: str, tmp_path: Path) -> None:
     """
     path = tmp_path / filename
 
-    assert CPath(path).open().read() == expected
+    with CPath(path).open() as fo:
+        assert fo.read() == expected
 
     for args in [
         [str(path)],
@@ -73,14 +69,10 @@ def test_zippath(tmp_path: Path) -> None:
 
     assert zp.read_text() == 'data in zip'
 
-    if sys.version_info[:2] == (3, 8):
-        assert zp.open(mode='r').read() == b'data in zip'
-    else:
-        assert zp.open(mode='rb').read() == b'data in zip'
+    assert zp.open(mode='rb').read() == b'data in zip'
 
-        assert zp.open(mode='r').read() == 'data in zip'
-        # 3.8 didn't support rt
-        assert zp.open(mode='rt').read() == 'data in zip'  # type: ignore[call-overload]
+    assert zp.open(mode='r').read() == 'data in zip'
+    assert zp.open(mode='rt').read() == 'data in zip'  # type: ignore[call-overload]
 
     target = structure_data / 'gdpr_export.zip'
     assert target.exists(), target  # precondition
@@ -214,11 +206,7 @@ def test_kopen_kexists(tmp_path: Path) -> None:
     path = Path(tmp_path / 'file.zip')
 
     read_res = kopen(path, 'path', 'in', 'archive').read()
-    if sys.version_info[:2] == (3, 8):
-        # seems that zippath used to return bytes in 3.8
-        assert read_res == b'data in zip'
-    else:
-        assert read_res == 'data in zip'
+    assert read_res == 'data in zip'
     assert kexists(path, 'path/in/archive')
     assert not kexists(path, 'does/not/exist')
 

@@ -6,10 +6,11 @@ import os
 import pathlib
 import sys
 import tarfile
+from collections.abc import Generator, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from tarfile import TarFile, TarInfo
-from typing import Dict, Generator, Iterator
+from typing import Dict
 
 from typing_extensions import Self
 
@@ -110,10 +111,10 @@ class TarPath(Path):
         assert n is not None, f"path {self} doesn't exist"
         return n
 
-    def is_file(self) -> bool:
+    def is_file(self, *, follow_symlinks: bool = True) -> bool:  # noqa: ARG002
         return self.node.info.isfile()
 
-    def is_dir(self) -> bool:
+    def is_dir(self, *, follow_symlinks: bool = True) -> bool:  # noqa: ARG002
         return self.node.info.isdir()
 
     def exists(self, **kwargs) -> bool:  # noqa: ARG002
@@ -154,7 +155,7 @@ class TarPath(Path):
         if 'b' in mode:  # meh
             return extracted
         else:
-            return io.TextIOWrapper(extracted, encoding=kwargs.get('encoding'))  # type: ignore[arg-type]
+            return io.TextIOWrapper(extracted, encoding=kwargs.get('encoding'))
 
     @staticmethod
     def _make_args(path: Path) -> tuple[TarFile, Nodes, Node]:

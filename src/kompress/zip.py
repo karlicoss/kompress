@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import os
 import zipfile
+from collections.abc import Iterator, Sequence
 from datetime import datetime
 from functools import total_ordering
 from pathlib import Path
-from typing import Iterator, Sequence
 
 from .utils import walk_paths
 
@@ -15,6 +15,7 @@ class ZipPath(zipfile.Path):
     # NOTE: is_dir/is_file might not behave as expected, the base class checks it only based on the slash in path
 
     _flavour = os.path  # this is necessary for some pathlib operations (in particular python 3.12)
+    parser = os.path  # same but for 3.13
 
     # seems that root/at are not exposed in the docs, so might be an implementation detail
     root: zipfile.CompleteDirs
@@ -69,8 +70,7 @@ class ZipPath(zipfile.Path):
         rpaths = (p for p in rpaths if Path(p).match(glob))
         return (ZipPath(self.root, p) for p in rpaths)
 
-    # TODO remove unused-ignore after 3.8
-    def relative_to(self, other: ZipPath, *extra: str | os.PathLike[str]) -> Path:  # type: ignore[override,unused-ignore]
+    def relative_to(self, other: ZipPath, *extra: str | os.PathLike[str]) -> Path:  # type: ignore[override, unused-ignore]
         assert self.filepath == other.filepath, (self.filepath, other.filepath)
         return self.subpath.relative_to(other.subpath, *extra)
 
@@ -99,7 +99,7 @@ class ZipPath(zipfile.Path):
 
     def iterdir(self) -> Iterator[ZipPath]:
         for s in self._as_dir().iterdir():
-            yield ZipPath(s.root, s.at)  # type: ignore[attr-defined]
+            yield ZipPath(s.root, s.at)
 
     @property
     def stem(self) -> str:
