@@ -113,11 +113,7 @@ def _cpath_open(path: Path | str, *args, mode: str = 'rt', **kwargs) -> IO:
     elif name.endswith(Ext.zip):
         zpath = ZipPath(pp)
         [subpath] = args  # meh?
-        if sys.version_info[:2] == (3, 8):
-            if mode == 'rt':
-                mode = 'r'  # ugh, 3.8 doesn't support rt here
-        # TODO pass **kwargs later to support encoding? kinda annoying, 3.8 doesn't support it
-        return (zpath / subpath).open(mode=mode)
+        return (zpath / subpath).open(mode=mode, **kwargs)
     elif name.endswith(Ext.lz4):
         import lz4.frame  # type: ignore
 
