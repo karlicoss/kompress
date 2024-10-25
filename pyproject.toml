@@ -54,7 +54,7 @@ local_scheme = "dirty-tag"
 # things I'm not sure about yet
 # - avoiding duplication/variable reuse?
 # - file/git dependencies?
-# - unclear how to specify namespace package order https://github.com/seanbreckenridge/reorder_editable/issues/2
+# - unclear how to specify namespace package order https://github.com/purarue/reorder_editable/issues/2
 
 # TODO
 # - maybe it has a nicer pypi upload system? not sure
