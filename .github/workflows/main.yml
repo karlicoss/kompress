@@ -77,9 +77,7 @@ jobs:
     - name: 'release to test pypi'
       # always deploy merged master to test pypi
       if: github.event_name != 'pull_request' && github.event.ref == 'refs/heads/master'
-      env:
-        TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD_TEST }}
-      run: pip3 install --user --upgrade build twine && .ci/release --test
+      run: .ci/release-uv --use-test-pypi
 
     - name: 'release to pypi'
       # always deploy tags to release pypi
