@@ -7,12 +7,11 @@ from __future__ import annotations
 import os
 from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import List, Tuple
 
 RootName = str
 DirName = str
 FileName = str
-Entry = Tuple[RootName, List[Tuple[DirName, 'Entry']], List[FileName]]
+Entry = tuple[RootName, list[tuple[DirName, 'Entry']], list[FileName]]
 
 
 def walk_paths(

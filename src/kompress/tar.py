@@ -10,7 +10,6 @@ from collections.abc import Generator, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from tarfile import TarFile, TarInfo
-from typing import Dict
 
 from typing_extensions import Self
 
@@ -29,7 +28,7 @@ class Node:
         return self.info.name.rsplit('/', maxsplit=1)[-1]
 
 
-Nodes = Dict[str, Node]
+Nodes = dict[str, Node]
 
 
 def _tarpath(tf: TarFile) -> Path:
