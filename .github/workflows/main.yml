@@ -38,6 +38,8 @@ jobs:
     - uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
+      
+    - uses: astral-sh/setup-uv@v5
 
     - uses: actions/checkout@v4
       with:
@@ -87,6 +89,4 @@ jobs:
       # always deploy tags to release pypi
       # NOTE: release tags are guarded by on: push: tags on the top
       if: github.event_name != 'pull_request' && startsWith(github.event.ref, 'refs/tags')
-      env:
-        TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
-      run: pip3 install --user --upgrade build twine && .ci/release
+      run: .ci/release-uv
