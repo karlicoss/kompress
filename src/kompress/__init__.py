@@ -115,7 +115,7 @@ def _cpath_open(path: Path | str, *args, mode: str = 'rt', **kwargs) -> IO:
         [subpath] = args  # meh?
         return (zpath / subpath).open(mode=mode, **kwargs)
     elif name.endswith(Ext.lz4):
-        import lz4.frame  # type: ignore
+        import lz4.frame  # type: ignore[import-untyped]
 
         return lz4.frame.open(str(pp), mode, *args, **kwargs)
     elif name.endswith((Ext.zstd, Ext.zst)):
