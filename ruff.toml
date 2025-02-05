@@ -1,3 +1,8 @@
+# NOTE: version is inferred from pyproject.toml if present
+#   however, if ruff.toml is separate, pyproject isn't even parsed..
+#   see https://github.com/astral-sh/ruff/issues/10299
+target-version = "py39"
+
 lint.extend-select = [
     "F",    # flakes rules -- default, but extend just in case
     "E",    # pycodestyle  -- default, but extend just in case
@@ -60,12 +65,6 @@ lint.ignore = [
 
 ## might be nice .. but later and I don't wanna make it strict
     "E402",  # Module level import not at top of file
-
-### maybe consider these soon
-    # sometimes it's useful to give a variable a name even if we don't use it as a documentation
-    # on the other hand, often is a sign of error
-    "F841",  # Local variable `count` is assigned to but never used
-###
 
     "RUF100",  # unused noqa -- handle later
     "RUF012",  # mutable class attrs should be annotated with ClassVar... ugh pretty annoying for user configs
