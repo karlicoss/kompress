@@ -37,10 +37,16 @@ def test_cpath_zip(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(
     ('filename', 'expected'),
+    # fmt: off
     [
-        ('file', 'just plaintext'),
-        ('file.xz', 'compressed text'),
+        ('file'    , 'just plaintext'),
+        ('file.xz' , 'compressed text'),
+        ('file.zst', 'compressed text'),
+        ('file.gz' , 'compressed text'),
+        # FIXME lz4 read_text() seems broken at the moment?
+        # ('file.lz4', 'compressed text'),
     ],
+    # fmt: on
 )
 def test_cpath_regular(filename: str, expected: str, tmp_path: Path) -> None:
     """
@@ -50,6 +56,12 @@ def test_cpath_regular(filename: str, expected: str, tmp_path: Path) -> None:
 
     with CPath(path).open() as fo:
         assert fo.read() == expected
+
+    with CPath(path).open(mode='rt') as fo:
+        assert fo.read() == expected
+
+    with CPath(path).open(mode='rb') as fo:
+        assert fo.read() == expected.encode('ascii')
 
     for args in [
         [str(path)],
@@ -214,9 +226,28 @@ def test_kopen_kexists(tmp_path: Path) -> None:
 @pytest.fixture(autouse=True)
 def prepare_data(tmp_path: Path):
     (tmp_path / 'file').write_text('just plaintext')
+
+    # xz
     with (tmp_path / 'file.xz').open('wb') as f:
         with lzma.open(f, 'w') as lzf:
             lzf.write(b'compressed text')
+
+    # zst
+    import zstandard as zstd
+
+    zst_ctx = zstd.ZstdCompressor()
+    (tmp_path / 'file.zst').write_bytes(zst_ctx.compress(b'compressed text'))
+
+    # gz
+    gzf = tmp_path / 'file.gz'
+    with gzip.open(gzf, 'wb') as f:
+        f.write(b'compressed text')
+
+    # lz4
+    import lz4.frame  # type: ignore[import-untyped]
+
+    (tmp_path / 'file.lz4').write_bytes(lz4.frame.compress(b'compressed text'))
+
     with zipfile.ZipFile(tmp_path / 'file.zip', 'w') as zf:
         zf.writestr('path/in/archive', 'data in zip')
     try:
