@@ -5,7 +5,7 @@ import io
 import os
 import pathlib
 import sys
-import tarfile
+import warnings
 from pathlib import Path
 from typing import IO, TYPE_CHECKING
 
@@ -30,22 +30,6 @@ def is_compressed(p: Path | str) -> bool:
     # todo kinda lame way for now.. use mime ideally?
     # should cooperate with kompress.kopen?
     return pp.name.endswith((Ext.xz, Ext.zip, Ext.lz4, Ext.zstd, Ext.zst, Ext.targz, Ext.gz))
-
-
-def _zstd_open(path: Path, *args, **kwargs) -> IO:  # noqa: ARG001
-    import zstandard
-
-    fh = path.open('rb')
-    dctx = zstandard.ZstdDecompressor()
-    reader = dctx.stream_reader(fh)
-
-    mode = kwargs.get('mode', 'rt')
-    if mode == 'rb':
-        return reader
-    else:
-        # must be text mode
-        kwargs.pop('mode')  # TextIOWrapper doesn't like it
-        return io.TextIOWrapper(reader, **kwargs)  # meh
 
 
 class CPath(Path):
@@ -76,81 +60,86 @@ class CPath(Path):
             return TarPath(path)
         return super().__new__(cls, *args, **kwargs)
 
-    def open(self, *args, **kwargs):  # noqa: ARG002
-        kopen_kwargs = {}
-        mode = kwargs.get('mode')
-        if mode is not None:
-            kopen_kwargs['mode'] = mode
-        encoding = kwargs.get('encoding')
-        if encoding is not None:
-            kopen_kwargs['encoding'] = encoding
-        # TODO assert read only?
-        return _cpath_open(str(self), **kopen_kwargs)
+    def open(  # type: ignore[override]
+        self,
+        mode: str = 'r',
+        buffering: int = -1,
+        encoding: str | None = None,
+        errors: str | None = None,
+        **kwargs,
+    ):
+        if buffering != -1:
+            # buffering is unsupported by most compressed formats
+            warnings.warn(f"while opening {self}: CPath doesn't support buffering")
+        # simply forward the rest of positional args
+        kwargs['encoding'] = encoding
+        kwargs['errors'] = errors
+        return _cpath_open(
+            path=str(self),
+            mode=mode,
+            **kwargs,
+        )
 
 
-def _cpath_open(path: Path | str, *args, mode: str = 'rt', **kwargs) -> IO:
-    # just in case, but I think this shouldn't be necessary anymore
-    # since when we call .read_text, encoding is passed already
-    if mode in {'r', 'rt'}:
-        encoding = kwargs.get('encoding', 'utf8')
-    else:
-        encoding = None
-    kwargs['encoding'] = encoding
+def _cpath_open(*, path: Path | str, mode: str, **kwargs) -> IO:
+    if 'w' in mode:
+        raise RuntimeError(f"Tring to open {path} in {mode=}. CPath only supports reading.")
 
     pp = Path(path)
     name = pp.name
-    if name.endswith(Ext.xz):
+    if name.endswith((Ext.zstd, Ext.zst)):
+        import zstandard
+
+        fh = pp.open('rb')
+        dctx = zstandard.ZstdDecompressor()
+        reader = dctx.stream_reader(fh)
+
+        if mode == 'rb':
+            return reader
+        else:
+            # must be text mode
+            # NOTE: no need to pass mode, TextIOWrapper doesn't like it
+            return io.TextIOWrapper(reader, **kwargs)  # meh
+    elif name.endswith(Ext.xz):
         import lzma
 
-        # ugh. for lzma, 'r' means 'rb'
+        # for lzma, 'r' means 'rb'
         # https://github.com/python/cpython/blob/d01cf5072be5511595b6d0c35ace6c1b07716f8d/Lib/lzma.py#L97
-        # whereas for regular open, 'r' means 'rt'
-        # https://docs.python.org/3/library/functions.html#open
+        # whereas for Path.open, 'r' means 'rt'
         if mode == 'r':
             mode = 'rt'
-        kwargs['mode'] = mode
-        return lzma.open(pp, *args, **kwargs)
-    elif name.endswith(Ext.zip):
-        zpath = ZipPath(pp)
-        [subpath] = args  # meh?
-        return (zpath / subpath).open(mode=mode, **kwargs)
+        return lzma.open(pp, mode=mode, **kwargs)
     elif name.endswith(Ext.lz4):
         import lz4.frame  # type: ignore[import-untyped]
 
-        return lz4.frame.open(str(pp), mode, *args, **kwargs)
-    elif name.endswith((Ext.zstd, Ext.zst)):
-        kwargs['mode'] = mode
-        return _zstd_open(pp, *args, **kwargs)
-    elif name.endswith(Ext.targz):
-        # TODO don't think .tar.gz can be just a raw file? I think it's always sort of a directory (possibly with a single file)
-        # TODO pass mode?
-        tf = tarfile.open(pp)
-        # TODO pass encoding?
-        x = tf.extractfile(*args)
-        assert x is not None
-        return x
-    elif name.endswith(Ext.gz):
-        # for gzip 'r' means 'rb' returns a gzip.Gzipfile (in binary mode)
-        # here, 'r' defaults to 'rt', to read as text
-        #
-        # https://docs.python.org/3/library/gzip.html#gzip.open
-        #
-        # if you supply mode 'rb', this *will* return bytes, but
-        # sort of defeats the point of kopen
         if mode == 'r':
+            # lz4 uses rb by default
+            # whereas for Path.open, 'r' means 'rt'
             mode = 'rt'
 
-        kwargs['mode'] = mode
+        return lz4.frame.open(str(pp), mode=mode, **kwargs)
+    elif name.endswith(Ext.gz):
+        if mode == 'r':
+            # for gzip 'r' means 'rb' returns a gzip.Gzipfile (in binary mode)
+            # whereas for Path.open, 'r' means 'rt'
+            mode = 'rt'
 
         # gzip does not support encoding in binary mode
+        # TODO tbh, open() docs are saying encoding shouldn't be passed in binary mode, not sure what this was for?
         if 'b' in mode:
             del kwargs['encoding']
 
         # gzip.open already returns a io.TextIOWrapper if encoding is specified
         # and its not in binary mode
-        return gzip.open(pp, *args, **kwargs)
+        return gzip.open(pp, mode=mode, **kwargs)  # type: ignore[return-value]
+    elif name.endswith(Ext.zip):
+        # this should be handled by ZipPath (see CPath.__new__)
+        raise RuntimeError("shouldn't happen")
+    elif name.endswith(Ext.targz):
+        # this should be handled by TarPath (see CPath.__new__)
+        raise RuntimeError("shouldn't happen")
     else:
-        return pp.open(mode, *args, **kwargs)
+        return pp.open(mode=mode, **kwargs)
 
 
 if not TYPE_CHECKING:

@@ -43,8 +43,7 @@ def test_cpath_zip(tmp_path: Path) -> None:
         ('file.xz' , 'compressed text'),
         ('file.zst', 'compressed text'),
         ('file.gz' , 'compressed text'),
-        # FIXME lz4 read_text() seems broken at the moment?
-        # ('file.lz4', 'compressed text'),
+        ('file.lz4', 'compressed text'),
     ],
     # fmt: on
 )
@@ -60,8 +59,17 @@ def test_cpath_regular(filename: str, expected: str, tmp_path: Path) -> None:
     with CPath(path).open(mode='rt') as fo:
         assert fo.read() == expected
 
-    with CPath(path).open(mode='rb') as fo:
+    with CPath(path).open('r') as fo:
+        assert fo.read() == expected
+
+    with CPath(path).open('r', encoding='utf8') as fo:
+        assert fo.read() == expected
+
+    with CPath(path).open('rb') as fo:
         assert fo.read() == expected.encode('ascii')
+
+    assert CPath(path).read_text() == expected
+    assert CPath(path).read_bytes() == expected.encode('ascii')
 
     for args in [
         [str(path)],
