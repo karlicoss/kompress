@@ -21,18 +21,21 @@ maintainers = [
 Homepage = "https://github.com/karlicoss/kompress"
 ##
 
+
 [project.optional-dependencies]
-testing = [
-    "pytest",
-    "ruff",
-    "mypy",
-    "lxml",  # for mypy html coverage
-]
 zstd = [
     "zstandard",
 ]
 lz4 = [
     "lz4"
+]
+
+[dependency-groups]
+testing = [
+    "pytest",
+    "ruff",
+    "mypy",
+    "lxml",  # for mypy html coverage
 ]
 
 
