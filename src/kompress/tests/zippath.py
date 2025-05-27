@@ -44,22 +44,22 @@ def test_walk_2(tmp_path: Path) -> None:
     assert path.exists()
     zp = ZipPath(path)
 
+    # fmt: off
     assert list(zp.walk()) == [
-        # fmt: off
         (zp              , ['aaa', 'empty_dir'], ['file']),
         (zp / 'aaa'      , ['ccc']             , ['bbb']),
         (zp / 'aaa/ccc'  , []                  , ['ddd']),
         (zp / 'empty_dir', []                  , []),
-        # fmt: on
     ]
+    # fmt: on
 
     # testcase when we aren't starting from root
+    # fmt: off
     assert list((zp / 'aaa').walk()) == [
-        # fmt: off
         (zp / 'aaa'      , ['ccc']             , ['bbb']),
         (zp / 'aaa/ccc'  , []                  , ['ddd']),
-        # fmt: on
     ]
+    # fmt: on
 
     # check that .walk respects modifying dirs in-place, like regular pathlib
     all_files = []

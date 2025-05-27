@@ -41,7 +41,6 @@ def _tarpath(tf: TarFile) -> Path:
 
 
 class TarPath(Path):
-
     if sys.version_info[:2] < (3, 12):
         # older version of python need _flavour defined
         _flavour = pathlib._windows_flavour if os.name == 'nt' else pathlib._posix_flavour  # type: ignore[attr-defined]

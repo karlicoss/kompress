@@ -88,21 +88,21 @@ def test_walk_paths_basic() -> None:
     ]
 
     # one empty dir
+    # fmt: off
     assert list(walk_paths(['aaa/'], separator='/')) == [
-        # fmt: off
         ('.'  , ['aaa'], []),
         ('aaa', []     , []),
-        # fmt: on
     ]
+    # fmt: on
 
     # dir with one dir with one file
+    # fmt: off
     assert list(walk_paths(['aaa/', 'aaa/bbb/', 'aaa/bbb/fff'], separator='/')) == [
-        # fmt: off
         ('.'      , ['aaa'], []),
         ('aaa'    , ['bbb'], []),
         ('aaa/bbb', []     , ['fff']),
-        # fmt: on
     ]
+    # fmt: on
 
 
 def test_walk_paths_against_stdlib() -> None:
@@ -111,13 +111,13 @@ def test_walk_paths_against_stdlib() -> None:
     import pytest
 
     if sys.version_info[:2] < (3, 12):
-        pytest.skip("pathlibe.Path.walk is only present from python 3.12")
+        pytest.skip("pathlib.Path.walk is only present from python 3.12")
 
     def as_paths(root: Path) -> Iterator[str]:
         for r, dirs, files in root.walk():
             rr = r.relative_to(root)
             for d in dirs:
-                yield f'{rr/ d}{os.sep}'
+                yield f'{rr / d}{os.sep}'
             for f in files:
                 yield str(rr / f)
 
