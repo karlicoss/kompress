@@ -35,7 +35,6 @@ def test_cpath_zip(tmp_path: Path) -> None:
     assert not (CPath(tmp_path / 'nosuchzip.zip') / 'path/in/archive').exists()
 
 
-# fmt: off
 @pytest.mark.parametrize(
     ('filename', 'expected'),
     [
@@ -45,8 +44,7 @@ def test_cpath_zip(tmp_path: Path) -> None:
         ('file.gz' , 'compressed text'),
         ('file.lz4', 'compressed text'),
     ],
-)
-# fmt: on
+)  # fmt: skip
 def test_cpath_regular(filename: str, expected: str, tmp_path: Path) -> None:
     """
     Check different ways of interacting with CPath
