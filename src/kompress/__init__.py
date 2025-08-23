@@ -70,7 +70,7 @@ class CPath(Path):
     ):
         if buffering != -1:
             # buffering is unsupported by most compressed formats
-            warnings.warn(f"while opening {self}: CPath doesn't support buffering")
+            warnings.warn(f"while opening {self}: CPath doesn't support buffering", stacklevel=2)
         # simply forward the rest of positional args
         kwargs['encoding'] = encoding
         kwargs['errors'] = errors

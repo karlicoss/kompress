@@ -126,7 +126,7 @@ class TarPath(Path):
             rpath = self._rpath / entry.name
             yield TarPath(tar=self.tar, _nodes=self._nodes, _rpath=rpath, _node=entry)
 
-    def glob(self, pattern: str, **kwargs) -> Iterator[TarPath]:  # type: ignore[override]  # noqa: ARG002
+    def glob(self, pattern: str, **kwargs) -> Iterator[TarPath]:  # type: ignore[override, unused-ignore]  # noqa: ARG002
         parts = self._rpath.parts
         prefix = '' if len(parts) == 0 else ('/'.join(parts) + '/')
         full_pattern = prefix + pattern
@@ -136,7 +136,7 @@ class TarPath(Path):
             rpath = Path(*p.split('/'))
             yield TarPath(tar=self.tar, _nodes=self._nodes, _rpath=rpath, _node=node)
 
-    def rglob(self, pattern: str, **kwargs) -> Iterator[TarPath]:  # type: ignore[override]  # noqa: ARG002
+    def rglob(self, pattern: str, **kwargs) -> Iterator[TarPath]:  # type: ignore[override, unused-ignore]  # noqa: ARG002
         # TODO ugh.. not necessarily consistent with pathlib behaviour... need to double check later
         return self.glob('*' + pattern)
 
@@ -157,7 +157,7 @@ class TarPath(Path):
 
     @staticmethod
     def _make_args(path: Path) -> tuple[TarFile, Nodes, Node]:
-        tf = tarfile.open(path, 'r')
+        tf = tarfile.open(path, 'r')  # noqa: SIM115
 
         sep = '/'  # note: doesn't really matter which separator is used here, this is just within this function
 
