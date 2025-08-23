@@ -68,8 +68,9 @@ class CPath(Path):
         errors: str | None = None,
         **kwargs,
     ):
-        if buffering != -1:
+        if buffering not in {-1, 0}:
             # buffering is unsupported by most compressed formats
+            # -1 is 'default', 0 means 'buffering off' (pathlib passes it since 3.14)
             warnings.warn(f"while opening {self}: CPath doesn't support buffering", stacklevel=2)
         # simply forward the rest of positional args
         kwargs['encoding'] = encoding
@@ -88,18 +89,28 @@ def _cpath_open(*, path: Path | str, mode: str, **kwargs) -> IO:
     pp = Path(path)
     name = pp.name
     if name.endswith((Ext.zstd, Ext.zst)):
-        import zstandard
+        if sys.version_info[:2] >= (3, 14):
+            from compression import zstd  # type: ignore[attr-defined]
 
-        fh = pp.open('rb')
-        dctx = zstandard.ZstdDecompressor()
-        reader = dctx.stream_reader(fh)
+            # ugh. default r for zstd is rb
+            # see https://docs.python.org/3.15/library/compression.zstd.html#compression.zstd.open
+            if mode == 'r':
+                mode = 'rt'
 
-        if mode == 'rb':
-            return reader
+            return zstd.open(path, mode=mode, **kwargs)
         else:
-            # must be text mode
-            # NOTE: no need to pass mode, TextIOWrapper doesn't like it
-            return io.TextIOWrapper(reader, **kwargs)  # meh
+            import zstandard as zstd
+
+            fh = pp.open('rb')
+            dctx = zstd.ZstdDecompressor()
+            reader = dctx.stream_reader(fh)
+
+            if mode == 'rb':
+                return reader
+            else:
+                # must be text mode
+                # NOTE: no need to pass mode, TextIOWrapper doesn't like it
+                return io.TextIOWrapper(reader, **kwargs)  # meh
     elif name.endswith(Ext.xz):
         import lzma
 

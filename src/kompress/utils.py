@@ -88,21 +88,17 @@ def test_walk_paths_basic() -> None:
     ]
 
     # one empty dir
-    # fmt: off
     assert list(walk_paths(['aaa/'], separator='/')) == [
         ('.'  , ['aaa'], []),
         ('aaa', []     , []),
-    ]
-    # fmt: on
+    ]  # fmt: skip
 
     # dir with one dir with one file
-    # fmt: off
     assert list(walk_paths(['aaa/', 'aaa/bbb/', 'aaa/bbb/fff'], separator='/')) == [
         ('.'      , ['aaa'], []),
         ('aaa'    , ['bbb'], []),
         ('aaa/bbb', []     , ['fff']),
-    ]
-    # fmt: on
+    ]  # fmt: skip
 
 
 def test_walk_paths_against_stdlib() -> None:

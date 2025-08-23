@@ -25,13 +25,13 @@ This currently supports these archive formats:
 
 - `.xz`
 - `.zip`
-- `.lz4` (`pip install 'kompress[lz4]'`)
-- `.zstd` (`pip install 'kompress[zstd]'`)
 - `.zst`
 - `.tar.gz`
 - `.gz`
+- `.zstd` (since `python3.14`, on older version use `pip install 'kompress[zstd]'`)
+- `.lz4` (`pip install 'kompress[lz4]'`)
 
-If it doesn't recognize the filetype, it will just call `pathlib.Path.open` like normal
+If it doesn't recognize the filetype, it will just call `pathlib.Path.open`, reading it like a regular file.
 
 Originally discussed in this [HPI issue](https://github.com/karlicoss/HPI/issues/20)
 
