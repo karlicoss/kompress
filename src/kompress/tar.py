@@ -15,10 +15,8 @@ from typing_extensions import Self
 
 from .utils import walk_paths
 
-maybe_slots = {'slots': True} if sys.version_info[:2] >= (3, 10) else {}
 
-
-@dataclass(**maybe_slots)
+@dataclass(slots=True)
 class Node:
     info: TarInfo
     children: list[Node]
