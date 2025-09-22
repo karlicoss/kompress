@@ -44,7 +44,7 @@ class CPath(Path):
 
     if sys.version_info[:2] < (3, 12):
         # older version of python need _flavour defined
-        _flavour = pathlib._windows_flavour if os.name == 'nt' else pathlib._posix_flavour  # type: ignore[attr-defined]
+        _flavour = getattr(pathlib, '_windows_flavour' if os.name == 'nt' else '_posix_flavour')  # type: ignore[attr-defined]
 
     def __new__(cls, *args, **kwargs):
         # TODO shortcut if args[0] is already Cpath?
@@ -90,7 +90,7 @@ def _cpath_open(*, path: Path | str, mode: str, **kwargs) -> IO:
     name = pp.name
     if name.endswith((Ext.zstd, Ext.zst)):
         if sys.version_info[:2] >= (3, 14):
-            from compression import zstd  # type: ignore[attr-defined]
+            from compression import zstd  # type: ignore[import-untyped]
 
             # ugh. default r for zstd is rb
             # see https://docs.python.org/3.15/library/compression.zstd.html#compression.zstd.open

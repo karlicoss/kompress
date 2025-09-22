@@ -224,7 +224,7 @@ def test_kopen_kexists(tmp_path: Path) -> None:
     """
     Testing deprecations, can remove when we remove kexists/kopen
     """
-    from .. import kexists, kopen  # type: ignore[attr-defined]
+    from .. import kexists, kopen  # type: ignore[attr-defined]  # These are only defined when not TYPE_CHECKING
 
     path = Path(tmp_path / 'file.zip')
 
@@ -245,7 +245,7 @@ def prepare_data(tmp_path: Path):
 
     # zst
     if sys.version_info[:2] >= (3, 14):
-        from compression import zstd  # type: ignore[attr-defined]
+        from compression import zstd  # type: ignore[import-untyped]
 
         with zstd.open(tmp_path / 'file.zst', 'wb') as f:
             f.write(b'compressed text')
