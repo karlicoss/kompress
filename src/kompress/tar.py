@@ -93,7 +93,7 @@ class TarPath(Path):
         if sys.version_info[:2] >= (3, 12):
             # in older version of python Path didn't have __init__, so this just calls object.__init__
             path = _tarpath(tar) / _rpath
-            super().__init__(path)
+            super().__init__(path)  # ty: ignore[too-many-positional-arguments]
 
         self.tar = tar
         self._nodes = _nodes
@@ -141,13 +141,14 @@ class TarPath(Path):
     def __repr__(self) -> str:
         return f'{self.tar=} {self._rpath=} {self._node=}'
 
-    def __truediv__(self, other) -> TarPath:
+    def __truediv__(self, key: str | os.PathLike[str]) -> TarPath:
         # TODO normalise it?
-        new_rpath = self._rpath / other
+        new_rpath = self._rpath / key
         return TarPath(tar=self.tar, _nodes=self._nodes, _rpath=new_rpath, _node=None)
 
     def open(self, mode: str = 'r', **kwargs):  # type: ignore[override]
         extracted = self.tar.extractfile(self.node.info)
+        assert extracted is not None
         if 'b' in mode:  # meh
             return extracted
         else:

@@ -89,12 +89,12 @@ class ZipPath(zipfile.Path):
         # used in 3.12 for some operations
         return self._parts
 
-    def __truediv__(self, key) -> ZipPath:
+    def __truediv__(self, add) -> ZipPath:
         # need to implement it so the return type is not zipfile.Path
-        if isinstance(key, Path):
+        if isinstance(add, Path):
             # zipfile always uses / separator
-            key = '/'.join(key.parts)
-        tmp = zipfile.Path(self.root) / self.at / key
+            add = '/'.join(add.parts)
+        tmp = zipfile.Path(self.root) / self.at / add
         return ZipPath(self.root, tmp.at)
 
     def iterdir(self) -> Iterator[ZipPath]:

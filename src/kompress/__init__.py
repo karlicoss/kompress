@@ -90,16 +90,17 @@ def _cpath_open(*, path: Path | str, mode: str, **kwargs) -> IO:
     name = pp.name
     if name.endswith((Ext.zstd, Ext.zst)):
         if sys.version_info[:2] >= (3, 14):
-            from compression import zstd  # type: ignore[attr-defined]
+            from compression import zstd
 
             # ugh. default r for zstd is rb
             # see https://docs.python.org/3.15/library/compression.zstd.html#compression.zstd.open
             if mode == 'r':
                 mode = 'rt'
 
-            return zstd.open(path, mode=mode, **kwargs)
+            return zstd.open(path, mode=mode, **kwargs)  # type: ignore[call-overload]
         else:
-            import zstandard as zstd
+            # ty does checks in both branches atm? see https://github.com/astral-sh/ty/issues/160
+            import zstandard as zstd  # ty: ignore[unresolved-import]
 
             fh = pp.open('rb')
             dctx = zstd.ZstdDecompressor()

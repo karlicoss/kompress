@@ -52,10 +52,6 @@ def test_cpath_regular(filename: str, expected: str, tmp_path: Path) -> None:
     """
     path = tmp_path / filename
 
-    if path.suffix == '.lz4':
-        if sys.version_info[:2] >= (3, 14):
-            pytest.skip("lz4 bindings are broken atm for 3.14+, see https://github.com/python-lz4/python-lz4/issues/302")
-
     with CPath(path).open() as fo:
         assert fo.read() == expected
 
@@ -245,12 +241,13 @@ def prepare_data(tmp_path: Path):
 
     # zst
     if sys.version_info[:2] >= (3, 14):
-        from compression import zstd  # type: ignore[attr-defined]
+        from compression import zstd
 
         with zstd.open(tmp_path / 'file.zst', 'wb') as f:
             f.write(b'compressed text')
     else:
-        import zstandard as zstd
+        # ty does checks in both branches atm? see https://github.com/astral-sh/ty/issues/160
+        import zstandard as zstd  # ty: ignore[unresolved-import]
 
         zst_ctx = zstd.ZstdCompressor()
         (tmp_path / 'file.zst').write_bytes(zst_ctx.compress(b'compressed text'))
@@ -261,12 +258,9 @@ def prepare_data(tmp_path: Path):
         f.write(b'compressed text')
 
     # lz4
-    if sys.version_info[:2] < (3, 14):
-        # lz4 bindings are broken atm for 3.14
-        # see https://github.com/python-lz4/python-lz4/issues/302
-        import lz4.frame  # type: ignore[import-untyped]
+    import lz4.frame  # type: ignore[import-untyped]
 
-        (tmp_path / 'file.lz4').write_bytes(lz4.frame.compress(b'compressed text'))
+    (tmp_path / 'file.lz4').write_bytes(lz4.frame.compress(b'compressed text'))
 
     with zipfile.ZipFile(tmp_path / 'file.zip', 'w') as zf:
         zf.writestr('path/in/archive', 'data in zip')
