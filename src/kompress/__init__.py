@@ -44,7 +44,7 @@ class CPath(Path):
 
     if sys.version_info[:2] < (3, 12):
         # older version of python need _flavour defined
-        _flavour = pathlib._windows_flavour if os.name == 'nt' else pathlib._posix_flavour  # type: ignore[attr-defined]
+        _flavour = pathlib._windows_flavour if os.name == 'nt' else pathlib._posix_flavour  # type: ignore[attr-defined]  # ty: ignore[unresolved-attribute]
 
     def __new__(cls, *args, **kwargs):
         # TODO shortcut if args[0] is already Cpath?
@@ -60,7 +60,7 @@ class CPath(Path):
             return TarPath(path)
         return super().__new__(cls, *args, **kwargs)
 
-    def open(  # type: ignore[override]
+    def open(  # type: ignore[override]  # ty: ignore[invalid-method-override]
         self,
         mode: str = 'r',
         buffering: int = -1,
@@ -99,8 +99,8 @@ def _cpath_open(*, path: Path | str, mode: str, **kwargs) -> IO:
 
             return zstd.open(path, mode=mode, **kwargs)  # type: ignore[call-overload]
         else:
-            # ty does checks in both branches atm? see https://github.com/astral-sh/ty/issues/160
-            import zstandard as zstd  # ty: ignore[unresolved-import]
+            # see https://github.com/astral-sh/ty/issues/2681 about multiple unused-ignore-comment...
+            import zstandard as zstd  # ty: ignore[unresolved-import,unused-ignore-comment,unused-ignore-comment]
 
             fh = pp.open('rb')
             dctx = zstd.ZstdDecompressor()
@@ -143,7 +143,7 @@ def _cpath_open(*, path: Path | str, mode: str, **kwargs) -> IO:
 
         # gzip.open already returns a io.TextIOWrapper if encoding is specified
         # and its not in binary mode
-        return gzip.open(pp, mode=mode, **kwargs)  # type: ignore[return-value]
+        return gzip.open(pp, mode=mode, **kwargs)  # type: ignore[return-value]  # ty: ignore[invalid-return-type]
     elif name.endswith(Ext.zip):
         # this should be handled by ZipPath (see CPath.__new__)
         raise RuntimeError("shouldn't happen")

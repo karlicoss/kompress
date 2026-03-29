@@ -41,7 +41,7 @@ def _tarpath(tf: TarFile) -> Path:
 class TarPath(Path):
     if sys.version_info[:2] < (3, 12):
         # older version of python need _flavour defined
-        _flavour = pathlib._windows_flavour if os.name == 'nt' else pathlib._posix_flavour  # type: ignore[attr-defined]
+        _flavour = pathlib._windows_flavour if os.name == 'nt' else pathlib._posix_flavour  # type: ignore[attr-defined]  # ty: ignore[unresolved-attribute]
 
     def __new__(
         cls,
@@ -54,7 +54,7 @@ class TarPath(Path):
         if isinstance(tar, TarPath):
             # make sure TarPath(TarPath(...)) works
             assert _node is None, _node  # just in case
-            return tar  # type: ignore[return-value]  # hmm doesn't like Self for some reason??
+            return tar  # type: ignore[return-value]  # ty: ignore[invalid-return-type]  # hmm doesn't like Self for some reason??
 
         if isinstance(tar, TarFile):
             # primary constructor, taking in Tarfile + relative Path
@@ -70,7 +70,7 @@ class TarPath(Path):
         if not path.exists():
             # if it doesn't exist, tarpath can't open it...
             # so it's the best we can do is just return a regular path
-            return path  # type: ignore[return-value]
+            return path  # type: ignore[return-value]  # ty: ignore[invalid-return-type]
 
         tar, nodes, root = TarPath._make_args(path)
         return cls(tar=tar, _nodes=nodes, _node=root, _rpath=Path())
@@ -93,7 +93,7 @@ class TarPath(Path):
         if sys.version_info[:2] >= (3, 12):
             # in older version of python Path didn't have __init__, so this just calls object.__init__
             path = _tarpath(tar) / _rpath
-            super().__init__(path)  # ty: ignore[too-many-positional-arguments]
+            super().__init__(path)
 
         self.tar = tar
         self._nodes = _nodes
@@ -124,7 +124,7 @@ class TarPath(Path):
             rpath = self._rpath / entry.name
             yield TarPath(tar=self.tar, _nodes=self._nodes, _rpath=rpath, _node=entry)
 
-    def glob(self, pattern: str, **kwargs) -> Iterator[TarPath]:  # type: ignore[override, unused-ignore]  # noqa: ARG002
+    def glob(self, pattern: str, **kwargs) -> Iterator[TarPath]:  # type: ignore[override, unused-ignore]  # ty: ignore[invalid-method-override]  # noqa: ARG002
         parts = self._rpath.parts
         prefix = '' if len(parts) == 0 else ('/'.join(parts) + '/')
         full_pattern = prefix + pattern
@@ -134,7 +134,7 @@ class TarPath(Path):
             rpath = Path(*p.split('/'))
             yield TarPath(tar=self.tar, _nodes=self._nodes, _rpath=rpath, _node=node)
 
-    def rglob(self, pattern: str, **kwargs) -> Iterator[TarPath]:  # type: ignore[override, unused-ignore]  # noqa: ARG002
+    def rglob(self, pattern: str, **kwargs) -> Iterator[TarPath]:  # type: ignore[override, unused-ignore]  # ty: ignore[invalid-method-override]  # noqa: ARG002
         # TODO ugh.. not necessarily consistent with pathlib behaviour... need to double check later
         return self.glob('*' + pattern)
 
@@ -146,7 +146,7 @@ class TarPath(Path):
         new_rpath = self._rpath / key
         return TarPath(tar=self.tar, _nodes=self._nodes, _rpath=new_rpath, _node=None)
 
-    def open(self, mode: str = 'r', **kwargs):  # type: ignore[override]
+    def open(self, mode: str = 'r', **kwargs):  # type: ignore[override]  # ty: ignore[invalid-method-override]
         extracted = self.tar.extractfile(self.node.info)
         assert extracted is not None
         if 'b' in mode:  # meh

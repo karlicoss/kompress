@@ -7,17 +7,13 @@ dependencies = [
 ]
 requires-python = ">=3.10"
 
-## these need to be set if you're planning to upload to pypi
+## these are only useful for pypi
 description = "pathlib.Path adapters to transparently read data from compressed files and folders"
-license = {file = "LICENSE"}
-authors = [
-    {name = "Dima Gerasimov (@karlicoss)", email = "karlicoss@gmail.com"},
-]
-maintainers = [
-    {name = "Dima Gerasimov (@karlicoss)", email = "karlicoss@gmail.com"},
-]
+license     = {file = "LICENSE"}
+authors     = [{name = "Dima Gerasimov (@karlicoss)", email = "karlicoss@gmail.com"}]
+maintainers = [{name = "Dima Gerasimov (@karlicoss)", email = "karlicoss@gmail.com"}]
 
-[project.urls]
+[project.urls]  # pypi will fetch some github stats/link, so somewhat useful
 Homepage = "https://github.com/karlicoss/kompress"
 ##
 
@@ -42,10 +38,11 @@ testing = [
     "kompress[zstd,lz4]",
 ]
 typecheck = [
-    { include-group = "testing" },
     "mypy",
     "lxml", # for mypy html coverage
-    "ty>=0.0.1a34",
+    "ty>=0.0.26",
+
+    { include-group = "testing" },
 ]
 
 

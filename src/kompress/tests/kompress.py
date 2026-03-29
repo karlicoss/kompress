@@ -91,7 +91,7 @@ def test_zippath(tmp_path: Path) -> None:
     assert zp.open(mode='rb').read() == b'data in zip'
 
     assert zp.open(mode='r').read() == 'data in zip'
-    assert zp.open(mode='rt').read() == 'data in zip'  # type: ignore[call-overload]
+    assert zp.open(mode='rt').read() == 'data in zip'  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]
 
     target = structure_data / 'gdpr_export.zip'
     assert target.exists(), target  # precondition
@@ -220,7 +220,7 @@ def test_kopen_kexists(tmp_path: Path) -> None:
     """
     Testing deprecations, can remove when we remove kexists/kopen
     """
-    from .. import kexists, kopen  # type: ignore[attr-defined]
+    from .. import kexists, kopen  # type: ignore[attr-defined]  # ty: ignore[unresolved-import]
 
     path = Path(tmp_path / 'file.zip')
 
@@ -240,14 +240,14 @@ def prepare_data(tmp_path: Path):
             lzf.write(b'compressed text')
 
     # zst
-    if sys.version_info[:2] >= (3, 14):
+    if sys.version_info >= (3, 14):
         from compression import zstd
 
         with zstd.open(tmp_path / 'file.zst', 'wb') as f:
             f.write(b'compressed text')
     else:
-        # ty does checks in both branches atm? see https://github.com/astral-sh/ty/issues/160
-        import zstandard as zstd  # ty: ignore[unresolved-import]
+        # see https://github.com/astral-sh/ty/issues/2681 about multiple unused-ignore-comment...
+        import zstandard as zstd  # ty: ignore[unresolved-import,unused-ignore-comment,unused-ignore-comment]
 
         zst_ctx = zstd.ZstdCompressor()
         (tmp_path / 'file.zst').write_bytes(zst_ctx.compress(b'compressed text'))
