@@ -63,16 +63,16 @@ class ZipPath(zipfile.Path):
         # note: seems that zip always uses forward slash, regardless OS?
         return zipfile.Path(self.root, self.at + '/')
 
-    def rglob(self, glob: str) -> Iterator[ZipPath]:
+    def rglob(self, pattern: str) -> Iterator[ZipPath]:
         # note: not 100% sure about the correctness, but seem fine?
         # Path.match() matches from the right, so need to
         rpaths = (p for p in self.root.namelist() if p.startswith(self.at))
-        rpaths = (p for p in rpaths if Path(p).match(glob))
+        rpaths = (p for p in rpaths if Path(p).match(pattern))
         return (ZipPath(self.root, p) for p in rpaths)
 
-    def relative_to(self, other: ZipPath, *extra: str | os.PathLike[str]) -> Path:  # type: ignore[override, unused-ignore]
+    def relative_to(self, other: ZipPath) -> Path:  # type: ignore[override, unused-ignore]  # ty: ignore[invalid-method-override]
         assert self.filepath == other.filepath, (self.filepath, other.filepath)
-        return self.subpath.relative_to(other.subpath, *extra)
+        return self.subpath.relative_to(other.subpath)
 
     @property
     def parts(self) -> Sequence[str]:
