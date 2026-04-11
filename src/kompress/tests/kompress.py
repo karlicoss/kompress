@@ -216,20 +216,6 @@ def test_gz(tmp_path: Path) -> None:
     assert CPath(gzf).read_bytes() == b'compressed text'
 
 
-def test_kopen_kexists(tmp_path: Path) -> None:
-    """
-    Testing deprecations, can remove when we remove kexists/kopen
-    """
-    from .. import kexists, kopen  # type: ignore[attr-defined]  # ty: ignore[unresolved-import]
-
-    path = Path(tmp_path / 'file.zip')
-
-    read_res = kopen(path, 'path', 'in', 'archive').read()
-    assert read_res == 'data in zip'
-    assert kexists(path, 'path/in/archive')
-    assert not kexists(path, 'does/not/exist')
-
-
 @pytest.fixture(autouse=True)
 def prepare_data(tmp_path: Path):
     (tmp_path / 'file').write_text('just plaintext')

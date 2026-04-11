@@ -2,10 +2,8 @@
 [project]
 dynamic = ["version"]  # version is managed by build backend
 name = "kompress"
-dependencies = [
-    "typing_extensions",
-]
-requires-python = ">=3.10"
+dependencies = []
+requires-python = ">=3.12"
 
 ## these are only useful for pypi
 description = "pathlib.Path adapters to transparently read data from compressed files and folders"

@@ -28,7 +28,7 @@ This currently supports these archive formats:
 - `.zst`
 - `.tar.gz`
 - `.gz`
-- `.zstd` (since `python3.14`, on older version use `pip install 'kompress[zstd]'`)
+- `.zstd` (since `python3.14`, on older versions use `pip install 'kompress[zstd]'`)
 - `.lz4` (`pip install 'kompress[lz4]'`)
 
 If it doesn't recognize the filetype, it will just call `pathlib.Path.open`, reading it like a regular file.

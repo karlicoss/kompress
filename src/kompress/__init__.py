@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import gzip
 import io
-import os
-import pathlib
 import sys
 import warnings
 from pathlib import Path
-from typing import IO, TYPE_CHECKING
+from typing import IO
 
 from .tar import TarPath
 from .zip import ZipPath
@@ -28,7 +26,6 @@ class Ext:
 def is_compressed(p: Path | str) -> bool:
     pp = p if isinstance(p, Path) else Path(p)
     # todo kinda lame way for now.. use mime ideally?
-    # should cooperate with kompress.kopen?
     return pp.name.endswith((Ext.xz, Ext.zip, Ext.lz4, Ext.zstd, Ext.zst, Ext.targz, Ext.gz))
 
 
@@ -36,15 +33,7 @@ class CPath(Path):
     """
     Hacky way to support compressed files.
     If you can think of a better way to do this, please let me know! https://github.com/karlicoss/HPI/issues/20
-
-    Ugh. So, can't override Path because of some _flavour thing.
-    Path only has _accessor and _closed slots, so can't directly set .open method
-    _accessor.open has to return file descriptor, doesn't work for compressed stuff.
     """
-
-    if sys.version_info[:2] < (3, 12):
-        # older version of python need _flavour defined
-        _flavour = pathlib._windows_flavour if os.name == 'nt' else pathlib._posix_flavour  # type: ignore[attr-defined]  # ty: ignore[unresolved-attribute]
 
     def __new__(cls, *args, **kwargs):
         # TODO shortcut if args[0] is already Cpath?
@@ -88,14 +77,15 @@ def _cpath_open(*, path: Path | str, mode: str, **kwargs) -> IO:
 
     pp = Path(path)
     name = pp.name
+
+    # most compressed-file libraries treat 'r' as 'rb', unlike pathlib where 'r' means 'rt'
+    # normalize once here so each branch doesn't have to repeat it
+    if mode == 'r' and is_compressed(name):
+        mode = 'rt'
+
     if name.endswith((Ext.zstd, Ext.zst)):
         if sys.version_info[:2] >= (3, 14):
             from compression import zstd
-
-            # ugh. default r for zstd is rb
-            # see https://docs.python.org/3.15/library/compression.zstd.html#compression.zstd.open
-            if mode == 'r':
-                mode = 'rt'
 
             return zstd.open(path, mode=mode, **kwargs)  # type: ignore[call-overload]
         else:
@@ -115,27 +105,12 @@ def _cpath_open(*, path: Path | str, mode: str, **kwargs) -> IO:
     elif name.endswith(Ext.xz):
         import lzma
 
-        # for lzma, 'r' means 'rb'
-        # https://github.com/python/cpython/blob/d01cf5072be5511595b6d0c35ace6c1b07716f8d/Lib/lzma.py#L97
-        # whereas for Path.open, 'r' means 'rt'
-        if mode == 'r':
-            mode = 'rt'
         return lzma.open(pp, mode=mode, **kwargs)
     elif name.endswith(Ext.lz4):
         import lz4.frame  # type: ignore[import-untyped]
 
-        if mode == 'r':
-            # lz4 uses rb by default
-            # whereas for Path.open, 'r' means 'rt'
-            mode = 'rt'
-
         return lz4.frame.open(str(pp), mode=mode, **kwargs)
     elif name.endswith(Ext.gz):
-        if mode == 'r':
-            # for gzip 'r' means 'rb' returns a gzip.Gzipfile (in binary mode)
-            # whereas for Path.open, 'r' means 'rt'
-            mode = 'rt'
-
         # gzip does not support encoding in binary mode
         # TODO tbh, open() docs are saying encoding shouldn't be passed in binary mode, not sure what this was for?
         if 'b' in mode:
@@ -154,25 +129,3 @@ def _cpath_open(*, path: Path | str, mode: str, **kwargs) -> IO:
         return pp.open(mode=mode, **kwargs)
 
 
-if not TYPE_CHECKING:
-    # FIXME deprecate properly
-    # still used in promnesia legacy takeout module? could migrate off
-    # ah ok, promnesia works off my.core.kompress (which is itself deprecated)
-    # so we could perhaps add kopen/kexists adapters that just do Cpath(first_arg) / Path(rest)?
-    # pass kwargs to open? like mode/encoding
-
-    from .compat import deprecated
-
-    @deprecated('use Cpath(...).open() instead')
-    def kopen(path, *args, **kwargs):
-        cpath = CPath(path) / Path(*args)
-        return cpath.open(**kwargs)
-
-    @deprecated('use Cpath(...).open() instead')
-    def open(*args, **kwargs):  # noqa: A001
-        return kopen(*args, **kwargs)
-
-    @deprecated('use Cpath(...).exists() instead')
-    def kexists(path, *args) -> bool:
-        cpath = CPath(path) / Path(*args)
-        return cpath.exists()

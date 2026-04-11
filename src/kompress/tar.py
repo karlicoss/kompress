@@ -3,15 +3,12 @@ from __future__ import annotations
 import fnmatch
 import io
 import os
-import pathlib
-import sys
 import tarfile
 from collections.abc import Generator, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from tarfile import TarFile, TarInfo
-
-from typing_extensions import Self
+from typing import Self
 
 from .utils import walk_paths
 
@@ -39,9 +36,6 @@ def _tarpath(tf: TarFile) -> Path:
 
 
 class TarPath(Path):
-    if sys.version_info[:2] < (3, 12):
-        # older version of python need _flavour defined
-        _flavour = pathlib._windows_flavour if os.name == 'nt' else pathlib._posix_flavour  # type: ignore[attr-defined]  # ty: ignore[unresolved-attribute]
 
     def __new__(
         cls,
@@ -90,10 +84,8 @@ class TarPath(Path):
         assert _nodes is not None
         assert _rpath is not None
 
-        if sys.version_info[:2] >= (3, 12):
-            # in older version of python Path didn't have __init__, so this just calls object.__init__
-            path = _tarpath(tar) / _rpath
-            super().__init__(path)
+        path = _tarpath(tar) / _rpath
+        super().__init__(path)
 
         self.tar = tar
         self._nodes = _nodes
