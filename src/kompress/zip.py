@@ -72,7 +72,7 @@ class ZipPath(zipfile.Path):
 
     def relative_to(self, other: ZipPath, *extra: str | os.PathLike[str]) -> Path:  # type: ignore[override, unused-ignore]
         assert self.filepath == other.filepath, (self.filepath, other.filepath)
-        return self.subpath.relative_to(other.subpath, *extra)
+        return self.subpath.relative_to(other.subpath.joinpath(*extra))
 
     @property
     def parts(self) -> Sequence[str]:

@@ -163,6 +163,10 @@ def test_zippath(tmp_path: Path) -> None:
         Path('profile' , 'settings.json'),
     ]
     # fmt: on
+    assert (zp / 'gdpr_export' / 'comments' / 'comments.json').relative_to(zp, 'gdpr_export') == Path(
+        'comments',
+        'comments.json',
+    )
 
     # NOTE: hmm interesting, seems that ZipPath is happy with forward slash regardless OS?
     assert list(zp.rglob('mes*')) == [ZipPath(target, 'gdpr_export/messages')]
