@@ -149,7 +149,7 @@ class ZipPath(zipfile.Path):
             'st_nlink': 1,
             'st_uid': 1000,
             'st_gid': 1000,
-            'st_size': 0,  # todo compute it properly?
+            'st_size': info.file_size,
             'st_atime': ts,
             'st_mtime': ts,
             'st_ctime': ts,
