@@ -268,7 +268,3 @@ def prepare_data(tmp_path: Path):
 
     with zipfile.ZipFile(tmp_path / 'file.zip', 'w') as zf:
         zf.writestr('path/in/archive', 'data in zip')
-    try:
-        yield None
-    finally:
-        pass

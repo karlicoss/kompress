@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import gzip
 import io
-import os
-import pathlib
 import sys
 import warnings
 from pathlib import Path
@@ -41,10 +39,6 @@ class CPath(Path):
     Path only has _accessor and _closed slots, so can't directly set .open method
     _accessor.open has to return file descriptor, doesn't work for compressed stuff.
     """
-
-    if sys.version_info[:2] < (3, 12):
-        # older version of python need _flavour defined
-        _flavour = pathlib._windows_flavour if os.name == 'nt' else pathlib._posix_flavour  # type: ignore[attr-defined]  # ty: ignore[unresolved-attribute]
 
     def __new__(cls, *args, **kwargs):
         # TODO shortcut if args[0] is already Cpath?
