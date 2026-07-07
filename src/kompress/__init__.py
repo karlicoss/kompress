@@ -44,14 +44,15 @@ class CPath(Path):
         # TODO shortcut if args[0] is already Cpath?
 
         path = Path(*args)
+        # Missing archive wrappers fall back to plain Path; CPath should stay CPath in that case.
         if path.name.endswith(Ext.zip):
-            if path.exists():
-                # if path doesn't exist, zipfile can't open it to read the index etc
-                # so it's the best we can do in this case?
-                # TODO move this into ZipPath.__new__?
-                return ZipPath(path)
+            zip_path = ZipPath(path)
+            if isinstance(zip_path, ZipPath):
+                return zip_path
         if path.name.endswith(Ext.targz):
-            return TarPath(path)
+            tar_path = TarPath(path)
+            if isinstance(tar_path, TarPath):
+                return tar_path
         return super().__new__(cls, *args, **kwargs)
 
     def open(  # type: ignore[override]  # ty: ignore[invalid-method-override]

@@ -7,6 +7,7 @@ from collections.abc import Iterator, Sequence
 from datetime import datetime
 from functools import total_ordering
 from pathlib import Path
+from typing import Self
 
 from .utils import walk_paths
 
@@ -21,6 +22,16 @@ class ZipPath(zipfile.Path):
     # seems that root/at are not exposed in the docs, so might be an implementation detail
     root: zipfile.CompleteDirs
     at: str
+
+    def __new__(cls, root: str | Path | zipfile.ZipFile | ZipPath, at: str = "") -> Self:
+        if isinstance(root, ZipPath | zipfile.ZipFile):
+            return super().__new__(cls)
+
+        path = Path(root)
+        if not path.exists():
+            return path / at  # type: ignore[return-value]  # ty: ignore[invalid-return-type]
+
+        return super().__new__(cls)
 
     def __init__(self, root: str | Path | zipfile.ZipFile | ZipPath, at: str = "") -> None:
         root_: str | Path | zipfile.ZipFile
