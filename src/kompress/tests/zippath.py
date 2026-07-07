@@ -100,3 +100,12 @@ def test_parent_joinpath_glob() -> None:
     assert comments.parent == zp / 'gdpr_export'
     assert comments.joinpath('comments.json') == comments / 'comments.json'
     assert list(comments.glob('*.json')) == [comments / 'comments.json']
+
+
+def test_stat_size() -> None:
+    target = structure_data / 'gdpr_export.zip'
+    assert target.exists(), target  # precondition
+
+    path = ZipPath(target) / 'gdpr_export' / 'messages' / 'index.csv'
+
+    assert path.stat().st_size == len(path.read_bytes())
