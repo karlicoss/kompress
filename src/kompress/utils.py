@@ -102,13 +102,6 @@ def test_walk_paths_basic() -> None:
 
 
 def test_walk_paths_against_stdlib() -> None:
-    import sys
-
-    import pytest
-
-    if sys.version_info[:2] < (3, 12):
-        pytest.skip("pathlib.Path.walk is only present from python 3.12")
-
     def as_paths(root: Path) -> Iterator[str]:
         for r, dirs, files in root.walk():
             rr = r.relative_to(root)

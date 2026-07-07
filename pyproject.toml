@@ -5,7 +5,7 @@ name = "kompress"
 dependencies = [
     "typing_extensions",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 
 ## these are only useful for pypi
 description = "pathlib.Path adapters to transparently read data from compressed files and folders"  # shows on project page/in search
@@ -164,7 +164,7 @@ lint.ignore = [
     "PERF401",
 
     # suggests no using exception in for loops
-    # we do use this technique a lot, plus in 3.11 happy path exception handling is "zero-cost"
+    # we do use this technique a lot, plus since 3.11 happy path exception handling is "zero-cost"
     "PERF203",
 
     "RET504", # unnecessary assignment before returning -- that can be useful for readability
