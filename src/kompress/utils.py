@@ -31,6 +31,7 @@ def walk_paths(
             p_parent, p_name = split
 
         is_dir = p_name == ''
+        dirname: str | None = None
 
         if is_dir:
             split = p_parent.rsplit(separator, maxsplit=1)
@@ -39,7 +40,7 @@ def walk_paths(
                 [dirname] = split
             else:
                 # todo hmm can we avoid extra split?
-                target_root, dirname = p_parent.rsplit(separator, maxsplit=1)
+                target_root, dirname = split
         else:
             target_root = p_parent
 
@@ -51,11 +52,12 @@ def walk_paths(
             stack_pos -= 1
 
         if is_dir:  # new dir detected!
+            assert dirname is not None
             new_entry: Entry = (p_parent, [], [])
             stack.append(new_entry)
             stack_pos = len(stack) - 1
 
-            parent_dirs.append((dirname, new_entry))  # type: ignore[possibly-undefined]
+            parent_dirs.append((dirname, new_entry))
         else:
             assert stack_pos != -1, (p, stack)
             parent_files.append(p_name)

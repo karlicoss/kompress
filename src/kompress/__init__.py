@@ -94,7 +94,9 @@ def _cpath_open(*, path: Path | str, mode: str, **kwargs) -> IO:
 
             return zstd.open(path, mode=mode, **kwargs)  # type: ignore[call-overload]
         else:
-            # see https://github.com/astral-sh/ty/issues/2681 about multiple unused-ignore-comment...
+            # ty checks this branch on Python 3.14 even though zstandard is only installed on <3.14.
+            # The duplicated unused-ignore-comment keeps this valid both when unresolved-import is used and unused.
+            # See https://github.com/astral-sh/ty/issues/2681
             import zstandard as zstd  # ty: ignore[unresolved-import,unused-ignore-comment,unused-ignore-comment]
 
             fh = pp.open('rb')
