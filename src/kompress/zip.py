@@ -63,6 +63,9 @@ class ZipPath(zipfile.Path):
         # note: seems that zip always uses forward slash, regardless OS?
         return zipfile.Path(self.root, self.at + '/')
 
+    def _next(self, at: str) -> ZipPath:
+        return ZipPath(self.root, at)
+
     def rglob(self, pattern: str) -> Iterator[ZipPath]:
         # note: not 100% sure about the correctness, but seem fine?
         # Path.match() matches from the right, so need to
