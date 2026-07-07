@@ -85,7 +85,7 @@ class ZipPath(zipfile.Path):
         rpaths = (p for p in rpaths if Path(p).match(pattern))
         return (ZipPath(self.root, p) for p in rpaths)
 
-    def relative_to(self, other: ZipPath, *extra: str | os.PathLike[str]) -> Path:  # type: ignore[override, unused-ignore]  # ty: ignore[invalid-method-override]
+    def relative_to(self, other: ZipPath, *extra: str | os.PathLike[str]) -> Path:  # type: ignore[override]  # ty: ignore[invalid-method-override]
         assert self.filepath == other.filepath, (self.filepath, other.filepath)
         return self.subpath.relative_to(other.subpath.joinpath(*extra))
 

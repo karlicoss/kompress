@@ -186,7 +186,7 @@ class TarPath(Path):
             rpath = Path(*p.split('/'))
             yield TarPath(tar=self.tar, _nodes=self._nodes, _rpath=rpath, _node=node)
 
-    def relative_to(self, other: TarPath, *extra: str | os.PathLike[str]) -> Path:  # type: ignore[override, unused-ignore]  # ty: ignore[invalid-method-override]
+    def relative_to(self, other: TarPath, *extra: str | os.PathLike[str]) -> Path:  # type: ignore[override]  # ty: ignore[invalid-method-override]
         assert _tarpath(self.tar) == _tarpath(other.tar), (_tarpath(self.tar), _tarpath(other.tar))
         return self._rpath.relative_to(other._rpath.joinpath(*extra))
 
