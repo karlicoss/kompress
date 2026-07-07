@@ -99,10 +99,12 @@ class TarPath(Path):
         return n
 
     def is_file(self, *, follow_symlinks: bool = True) -> bool:  # noqa: ARG002
-        return self.node.info.isfile()
+        node = self._node
+        return node is not None and node.info.isfile()
 
     def is_dir(self, *, follow_symlinks: bool = True) -> bool:  # noqa: ARG002
-        return self.node.info.isdir()
+        node = self._node
+        return node is not None and node.info.isdir()
 
     def exists(self, **kwargs) -> bool:  # noqa: ARG002
         return self._node is not None  # meh
@@ -173,8 +175,20 @@ class TarPath(Path):
             yield TarPath(tar=self.tar, _nodes=self._nodes, _rpath=rpath, _node=node)
 
     def rglob(self, pattern: str, **kwargs) -> Iterator[TarPath]:  # type: ignore[override, unused-ignore]  # ty: ignore[invalid-method-override]  # noqa: ARG002
-        # TODO ugh.. not necessarily consistent with pathlib behaviour... need to double check later
-        return self.glob('*' + pattern)
+        parts = self._rpath.parts
+        prefix = '' if len(parts) == 0 else ('/'.join(parts) + '/')
+        for p, node in self._nodes.items():
+            if not p.startswith(prefix):
+                continue
+            rest = p[len(prefix) :]
+            if rest == '' or not Path(rest).match(pattern):
+                continue
+            rpath = Path(*p.split('/'))
+            yield TarPath(tar=self.tar, _nodes=self._nodes, _rpath=rpath, _node=node)
+
+    def relative_to(self, other: TarPath, *extra: str | os.PathLike[str]) -> Path:  # type: ignore[override, unused-ignore]  # ty: ignore[invalid-method-override]
+        assert _tarpath(self.tar) == _tarpath(other.tar), (_tarpath(self.tar), _tarpath(other.tar))
+        return self._rpath.relative_to(other._rpath.joinpath(*extra))
 
     def __repr__(self) -> str:
         return f'{self.tar=} {self._rpath=} {self._node=}'
