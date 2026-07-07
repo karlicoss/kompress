@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import posixpath  # zip internal paths always use forward slashes
 import zipfile
 from collections.abc import Iterator, Sequence
 from datetime import datetime
@@ -107,6 +108,16 @@ class ZipPath(zipfile.Path):
     @property
     def stem(self) -> str:
         return self.subpath.stem
+
+    @property
+    def parent(self):
+        if self.at == '':
+            return self.filepath.parent
+
+        parent_at = posixpath.dirname(self.at.rstrip('/'))
+        if parent_at != '':
+            parent_at += '/'
+        return self._next(parent_at)
 
     @property  # type: ignore[misc]
     def __class__(self):

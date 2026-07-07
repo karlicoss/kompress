@@ -107,6 +107,23 @@ class TarPath(Path):
     def exists(self, **kwargs) -> bool:  # noqa: ARG002
         return self._node is not None  # meh
 
+    def stat(self, *, follow_symlinks: bool = True) -> os.stat_result:  # noqa: ARG002
+        info = self.node.info
+        return os.stat_result(
+            (
+                info.mode,
+                0,
+                0,
+                1,
+                info.uid,
+                info.gid,
+                info.size,
+                info.mtime,
+                info.mtime,
+                info.mtime,
+            ),
+        )
+
     def iterdir(self) -> Generator[TarPath, None, None]:
         node = self.node
         assert node.info.isdir()
@@ -114,6 +131,36 @@ class TarPath(Path):
         for entry in node.children:
             rpath = self._rpath / entry.name
             yield TarPath(tar=self.tar, _nodes=self._nodes, _rpath=rpath, _node=entry)
+
+    def walk(
+        self,
+        top_down: bool = True,  # noqa: FBT001,FBT002
+        on_error=None,
+        follow_symlinks: bool = False,  # noqa: FBT001,FBT002
+    ) -> Iterator[tuple[TarPath, list[str], list[str]]]:
+        assert top_down, "specifying top_down isn't supported for TarPath yet"
+        assert on_error is None, "on_error isn't supported for TarPath yet"
+
+        node = self._node
+        if node is None or not node.info.isdir():
+            return
+
+        child_dirs = {c.name: c for c in node.children if c.info.isdir()}
+        dirnames = sorted(child_dirs)
+        filenames = sorted(c.name for c in node.children if c.info.isfile())
+
+        yield self, dirnames, filenames
+
+        # Match pathlib.Path.walk: callers can mutate dirnames in-place to prune traversal.
+        for dirname in dirnames:
+            child = child_dirs.get(dirname)
+            if child is None:
+                continue
+            yield from TarPath(tar=self.tar, _nodes=self._nodes, _rpath=self._rpath / dirname, _node=child).walk(
+                top_down=top_down,
+                on_error=on_error,
+                follow_symlinks=follow_symlinks,
+            )
 
     def glob(self, pattern: str, **kwargs) -> Iterator[TarPath]:  # type: ignore[override, unused-ignore]  # ty: ignore[invalid-method-override]  # noqa: ARG002
         parts = self._rpath.parts
@@ -132,10 +179,17 @@ class TarPath(Path):
     def __repr__(self) -> str:
         return f'{self.tar=} {self._rpath=} {self._node=}'
 
+    @property
+    def parent(self):
+        if len(self._rpath.parts) == 0:
+            return Path(self).parent
+        return TarPath(tar=self.tar, _nodes=self._nodes, _rpath=self._rpath.parent, _node=None)
+
+    def joinpath(self, *pathsegments: str | os.PathLike[str]) -> TarPath:
+        return TarPath(tar=self.tar, _nodes=self._nodes, _rpath=self._rpath.joinpath(*pathsegments), _node=None)
+
     def __truediv__(self, key: str | os.PathLike[str]) -> TarPath:
-        # TODO normalise it?
-        new_rpath = self._rpath / key
-        return TarPath(tar=self.tar, _nodes=self._nodes, _rpath=new_rpath, _node=None)
+        return self.joinpath(key)
 
     def open(self, mode: str = 'r', **kwargs):  # type: ignore[override]  # ty: ignore[invalid-method-override]
         extracted = self.tar.extractfile(self.node.info)
