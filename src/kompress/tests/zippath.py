@@ -88,3 +88,15 @@ def test_walk_gdpr_export() -> None:
 
     results = list(_check_walk(zp))
     assert len(results) == 8
+
+
+def test_parent_joinpath_glob() -> None:
+    target = structure_data / 'gdpr_export.zip'
+    assert target.exists(), target  # precondition
+
+    zp = ZipPath(target)
+    comments = zp / 'gdpr_export' / 'comments'
+
+    assert comments.parent == zp / 'gdpr_export'
+    assert comments.joinpath('comments.json') == comments / 'comments.json'
+    assert list(comments.glob('*.json')) == [comments / 'comments.json']
