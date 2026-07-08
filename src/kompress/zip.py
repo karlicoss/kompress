@@ -12,9 +12,23 @@ from typing import Self
 from .utils import walk_paths
 
 
+def _without_dot_segments(at: str) -> str:
+    if at in {'', '.'}:
+        return ''
+
+    trailing_slash = at.endswith('/')
+    parts = [part for part in at.split('/') if part not in {'', '.'}]
+    normalized = '/'.join(parts)
+    if trailing_slash and normalized != '':
+        normalized += '/'
+    return normalized
+
+
 @total_ordering
 class ZipPath(zipfile.Path):
     # NOTE: is_dir/is_file might not behave as expected, the base class checks it only based on the slash in path
+    # TODO: maybe change __str__/__repr__; inherited zipfile.Path output is misleading here,
+    # e.g. Path('.../gdpr_export.zip', '') and a trailing slash for the archive root.
 
     _flavour = os.path  # this is necessary for some pathlib operations (in particular python 3.12)
     parser = os.path  # same but for 3.13
@@ -41,7 +55,7 @@ class ZipPath(zipfile.Path):
             at_ = root.at
         else:
             root_ = root
-            at_ = at
+            at_ = _without_dot_segments(at)
 
         super().__init__(root_, at_)
 
@@ -162,6 +176,9 @@ class ZipPath(zipfile.Path):
             # So the best we can do in that case (which still might be wrong is taking the file's stats instead :( )
             return self.filepath.stat()
 
+        # TODO: prefer the UT extra field when present, to better match an extracted regular file.
+        # For gdpr_export/comments/comments.json, unzip -l reports 2021-07-01 09:43 from that
+        # extra field, while zipfile exposes the central-directory DOS timestamp as 01:43.
         dt = datetime(*info.date_time)
         ts = int(dt.timestamp())
         params = {
