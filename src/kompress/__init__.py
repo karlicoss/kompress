@@ -79,7 +79,7 @@ class CPath(Path):
 
 def _cpath_open(*, path: Path | str, mode: str, **kwargs) -> IO:
     if 'w' in mode:
-        raise RuntimeError(f"Tring to open {path} in {mode=}. CPath only supports reading.")
+        raise RuntimeError(f"Trying to open {path} in {mode=}. CPath only supports reading.")
 
     pp = Path(path)
     name = pp.name

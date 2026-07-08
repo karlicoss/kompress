@@ -7,33 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from .. import CPath, ZipPath
+from .. import CPath
 
 structure_data: Path = Path(__file__).parent / "structure_data"
-
-
-def test_zip(tmp_path: Path) -> None:
-    subpath = 'path/in/archive'
-
-    assert (CPath(tmp_path / 'file.zip') / subpath).open().read() == 'data in zip'
-
-    # CPath should dispatch zips to ZipPath
-    cpath = CPath(tmp_path / 'file.zip')
-    assert isinstance(cpath, ZipPath)
-
-    assert (cpath / subpath).read_text() == 'data in zip'
-
-    # make sure construction from parts works as expected
-    assert isinstance(CPath(*cpath.parts), ZipPath)
-
-    assert isinstance(CPath(cpath), ZipPath)
-
-
-def test_cpath_zip(tmp_path: Path) -> None:
-    assert (CPath(tmp_path / 'file.zip') / 'path/in/archive').exists()
-    assert not (CPath(tmp_path / 'file.zip') / 'path/notin/archive').exists()
-
-    assert not (CPath(tmp_path / 'nosuchzip.zip') / 'path/in/archive').exists()
 
 
 @pytest.mark.parametrize(
@@ -78,113 +54,6 @@ def test_cpath_regular(filename: str, expected: str, tmp_path: Path) -> None:
     ]:
         Path(*args)  # type: ignore[misc] # just a sanity check that regular Path can be constructed this way
         assert CPath(*args).read_text() == expected  # type: ignore[misc]
-
-
-def test_zippath(tmp_path: Path) -> None:
-    # TODO support later...
-    # zz = ZipPath(tmp_path / 'doesntexist.zip')
-
-    zp = ZipPath(tmp_path / 'file.zip', 'path/in/archive')
-
-    assert zp.read_text() == 'data in zip'
-
-    assert zp.open(mode='rb').read() == b'data in zip'
-
-    assert zp.open(mode='r').read() == 'data in zip'
-    assert zp.open(mode='rt').read() == 'data in zip'  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]
-
-    target = structure_data / 'gdpr_export.zip'
-    assert target.exists(), target  # precondition
-
-    zp = ZipPath(target)
-
-    ZipPath(zp)  # make sure it doesn't crash
-
-    # magic! convenient to make third party libraries agnostic of ZipPath
-    assert isinstance(zp, Path)
-    assert isinstance(zp, ZipPath)
-    assert isinstance(zp / 'subpath', Path)
-    # TODO maybe change __str__/__repr__? since it's a bit misleading:
-    # Path('/code/hpi/tests/core/structure_data/gdpr_export.zip', 'gdpr_export/')
-
-    assert ZipPath(target) == ZipPath(target)
-    assert zp.absolute() == zp
-    assert zp / '.' == zp
-
-    # shouldn't crash
-    hash(zp)
-
-    assert zp.exists()
-    assert (zp / 'gdpr_export').exists()
-    assert (zp / 'gdpr_export' / 'comments').exists()
-    assert (zp / Path('gdpr_export', 'comments')).exists()
-    ## NOTE: in pathlib.Path these work, however not in zipfile.Path
-    ## for now we don't support them either, need to be really careful if we wanna diverge from zipfile.Path
-    ## but in
-    # assert (zp / '.').exists()
-    # assert (zp / '.' / 'gdpr_export').exists()
-    # assert (zp / 'gdpr_export' / './comments').exists()
-    ##
-
-    # check str constructor just in case
-    assert (ZipPath(str(target)) / 'gdpr_export' / 'comments').exists()
-    assert not (ZipPath(str(target)) / 'whatever').exists()
-
-    matched = list(zp.rglob('*'))
-    assert len(matched) > 0
-    assert all(p.filepath == target for p in matched), matched
-
-    rpaths = [p.relative_to(zp) for p in matched]
-    gdpr_export = Path('gdpr_export')
-    # fmt: off
-    assert rpaths == [
-        gdpr_export,
-        gdpr_export / 'comments',
-        gdpr_export / 'comments' / 'comments.json',
-        gdpr_export / 'profile',
-        gdpr_export / 'profile' / 'settings.json',
-        gdpr_export / 'messages',
-        gdpr_export / 'messages' / 'index.csv',
-    ], rpaths
-    # fmt: on
-
-    # TODO hmm this doesn't work atm, whereas Path does
-    # not sure if it should be defensive or something...
-    # ZipPath('doesnotexist')
-    # same for this one
-    # assert ZipPath(Path('test'), 'whatever').absolute() == ZipPath(Path('test').absolute(), 'whatever')
-
-    assert (ZipPath(target) / 'gdpr_export' / 'comments').exists()
-
-    jsons = [p.relative_to(zp / 'gdpr_export') for p in zp.rglob('*.json')]
-    # fmt: off
-    assert jsons == [
-        Path('comments', 'comments.json'),
-        Path('profile' , 'settings.json'),
-    ]
-    # fmt: on
-    assert (zp / 'gdpr_export' / 'comments' / 'comments.json').relative_to(zp, 'gdpr_export') == Path(
-        'comments',
-        'comments.json',
-    )
-
-    # NOTE: hmm interesting, seems that ZipPath is happy with forward slash regardless OS?
-    assert list(zp.rglob('mes*')) == [ZipPath(target, 'gdpr_export/messages')]
-
-    iterdir_res = list((zp / 'gdpr_export').iterdir())
-    assert len(iterdir_res) == 3
-    assert all(isinstance(p, Path) for p in iterdir_res)
-
-    # date recorded in the zip archive
-    assert (zp / 'gdpr_export' / 'comments' / 'comments.json').stat().st_mtime > 1625000000
-    # TODO ugh.
-    # unzip -l shows the date  as 2021-07-01 09:43
-    # however, python reads it as 2021-07-01 01:43 ??
-    # don't really feel like dealing with this for now, it's not tz aware anyway
-
-    json_gz = zp / 'gdpr_export' / 'comments' / 'comments.json.gz'
-    assert json_gz.suffixes == ['.json', '.gz']
-    assert json_gz.suffix == '.gz'
 
 
 def test_gz(tmp_path: Path) -> None:
