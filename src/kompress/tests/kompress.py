@@ -2,12 +2,13 @@ import gzip
 import io
 import lzma
 import sys
+import tarfile
 import zipfile
 from pathlib import Path
 
 import pytest
 
-from .. import CPath
+from .. import CPath, Ext, is_compressed
 
 structure_data: Path = Path(__file__).parent / "structure_data"
 
@@ -105,19 +106,22 @@ def test_kopen_kexists(tmp_path: Path) -> None:
 
 @pytest.fixture(autouse=True)
 def prepare_data(tmp_path: Path):
+    compressed_text = b'compressed text'
+
     (tmp_path / 'file').write_text('just plaintext')
 
     # xz
     with (tmp_path / 'file.xz').open('wb') as f:
         with lzma.open(f, 'w') as lzf:
-            lzf.write(b'compressed text')
+            lzf.write(compressed_text)
 
-    # zst
+    # zstd
     if sys.version_info >= (3, 14):
         from compression import zstd
 
-        with zstd.open(tmp_path / 'file.zst', 'wb') as f:
-            f.write(b'compressed text')
+        for suffix in [Ext.zst, Ext.zstd]:
+            with zstd.open(tmp_path / f'file{suffix}', 'wb') as f:
+                f.write(compressed_text)
     else:
         # ty checks this branch on Python 3.14 even though zstandard is only installed on <3.14.
         # The duplicated unused-ignore-comment keeps this valid both when unresolved-import is used and unused.
@@ -125,17 +129,33 @@ def prepare_data(tmp_path: Path):
         import zstandard as zstd  # ty: ignore[unresolved-import,unused-ignore-comment,unused-ignore-comment]
 
         zst_ctx = zstd.ZstdCompressor()
-        (tmp_path / 'file.zst').write_bytes(zst_ctx.compress(b'compressed text'))
+        for suffix in [Ext.zst, Ext.zstd]:
+            (tmp_path / f'file{suffix}').write_bytes(zst_ctx.compress(compressed_text))
 
     # gz
     gzf = tmp_path / 'file.gz'
     with gzip.open(gzf, 'wb') as f:
-        f.write(b'compressed text')
+        f.write(compressed_text)
 
     # lz4
     import lz4.frame  # type: ignore[import-untyped]
 
-    (tmp_path / 'file.lz4').write_bytes(lz4.frame.compress(b'compressed text'))
+    (tmp_path / 'file.lz4').write_bytes(lz4.frame.compress(compressed_text))
 
     with zipfile.ZipFile(tmp_path / 'file.zip', 'w') as zf:
         zf.writestr('path/in/archive', 'data in zip')
+
+    with tarfile.open(tmp_path / 'file.tar.gz', 'w:gz') as tf:
+        info = tarfile.TarInfo('file')
+        info.size = len(compressed_text)
+        tf.addfile(info, io.BytesIO(compressed_text))
+
+    # make sure all supported extensions are covered by test
+    for name, suffix in vars(Ext).items():
+        if name.startswith('_') or not isinstance(suffix, str):
+            continue
+        path = tmp_path / f'file{suffix}'
+        assert path.exists(), suffix
+        assert is_compressed(path)
+
+    assert not is_compressed(tmp_path / 'file')

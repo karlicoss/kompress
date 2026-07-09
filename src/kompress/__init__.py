@@ -23,11 +23,16 @@ class Ext:
     # fmt: on
 
 
+COMPRESSED_EXTENSIONS: tuple[str, ...] = tuple(
+    value for name, value in vars(Ext).items() if not name.startswith('_') and isinstance(value, str)
+)
+
+
 def is_compressed(p: Path | str) -> bool:
     pp = p if isinstance(p, Path) else Path(p)
     # todo kinda lame way for now.. use mime ideally?
     # should cooperate with kompress.kopen?
-    return pp.name.endswith((Ext.xz, Ext.zip, Ext.lz4, Ext.zstd, Ext.zst, Ext.targz, Ext.gz))
+    return pp.name.endswith(COMPRESSED_EXTENSIONS)
 
 
 class CPath(Path):
