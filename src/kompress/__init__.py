@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import bz2
 import gzip
 import io
 import sys
@@ -13,14 +14,23 @@ from .zip import ZipPath
 
 class Ext:
     # fmt: off
-    xz    = '.xz'
-    zip   = '.zip'
-    lz4   = '.lz4'
-    zstd  = '.zstd'
-    zst   = '.zst'
-    targz = '.tar.gz'
-    gz    = '.gz'
+    bz2    = '.bz2'
+    xz     = '.xz'
+    lz4    = '.lz4'
+    zstd   = '.zstd'
+    zst    = '.zst'
+    gz     = '.gz'
+    tar    = '.tar'
+    zip    = '.zip'
+    tgz    = '.tgz'
+    targz  = '.tar.gz'
+    tarbz2 = '.tar.bz2'
+    tarxz  = '.tar.xz'
+    tarzst = '.tar.zst'
     # fmt: on
+
+
+TAR_EXTENSIONS = (Ext.tar, Ext.tgz, Ext.targz, Ext.tarbz2, Ext.tarxz, Ext.tarzst)
 
 
 COMPRESSED_EXTENSIONS: tuple[str, ...] = tuple(
@@ -54,7 +64,7 @@ class CPath(Path):
             zip_path = ZipPath(path)
             if isinstance(zip_path, ZipPath):
                 return zip_path
-        if path.name.endswith(Ext.targz):
+        if path.name.endswith(TAR_EXTENSIONS):
             tar_path = TarPath(path)
             if isinstance(tar_path, TarPath):
                 return tar_path
@@ -88,6 +98,12 @@ def _cpath_open(*, path: Path | str, mode: str, **kwargs) -> IO:
 
     pp = Path(path)
     name = pp.name
+    if name.endswith(Ext.zip):
+        # this should be handled by ZipPath (see CPath.__new__)
+        raise RuntimeError("shouldn't happen")
+    if name.endswith(TAR_EXTENSIONS):
+        # this should be handled by TarPath (see CPath.__new__)
+        raise RuntimeError("shouldn't happen")
     if name.endswith((Ext.zstd, Ext.zst)):
         if sys.version_info[:2] >= (3, 14):
             from compression import zstd
@@ -123,6 +139,10 @@ def _cpath_open(*, path: Path | str, mode: str, **kwargs) -> IO:
         if mode == 'r':
             mode = 'rt'
         return lzma.open(pp, mode=mode, **kwargs)
+    elif name.endswith(Ext.bz2):
+        if mode == 'r':
+            mode = 'rt'
+        return bz2.open(pp, mode=mode, **kwargs)
     elif name.endswith(Ext.lz4):
         import lz4.frame  # type: ignore[import-untyped]
 
@@ -146,18 +166,11 @@ def _cpath_open(*, path: Path | str, mode: str, **kwargs) -> IO:
         # gzip.open already returns a io.TextIOWrapper if encoding is specified
         # and its not in binary mode
         return gzip.open(pp, mode=mode, **kwargs)  # type: ignore[return-value]  # ty: ignore[invalid-return-type]
-    elif name.endswith(Ext.zip):
-        # this should be handled by ZipPath (see CPath.__new__)
-        raise RuntimeError("shouldn't happen")
-    elif name.endswith(Ext.targz):
-        # this should be handled by TarPath (see CPath.__new__)
-        raise RuntimeError("shouldn't happen")
     else:
         return pp.open(mode=mode, **kwargs)
 
 
 if not TYPE_CHECKING:
-    # FIXME deprecate properly
     # still used in promnesia legacy takeout module? could migrate off
     # ah ok, promnesia works off my.core.kompress (which is itself deprecated)
     # so we could perhaps add kopen/kexists adapters that just do Cpath(first_arg) / Path(rest)?
