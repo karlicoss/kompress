@@ -3,6 +3,7 @@ from __future__ import annotations
 import fnmatch
 import io
 import os
+import sys
 import tarfile
 from collections.abc import Generator, Iterator
 from dataclasses import dataclass
@@ -64,6 +65,8 @@ class TarPath(Path):
             # if it doesn't exist, tarpath can't open it...
             # so it's the best we can do is just return a regular path
             return path  # type: ignore[return-value]  # ty: ignore[invalid-return-type]
+        if path.name.endswith('.tar.zst') and sys.version_info[:2] < (3, 14):
+            raise RuntimeError(".tar.zst requires Python 3.14+")
 
         tar, nodes, root = TarPath._make_args(path)
         return cls(tar=tar, _nodes=nodes, _node=root, _rpath=Path())
@@ -265,80 +268,7 @@ class TarPath(Path):
         return (tf, nodes, root_node)
 
 
-# TODO unify tests with zippath?
-def test_tar_dir(tmp_path: Path) -> None:
-    from . import CPath  # avoid circular import
-
-    nonexistent = CPath(tmp_path / 'donotexist.tar.gz')
-    assert not nonexistent.exists()
-
-    structure_data: Path = Path(__file__).parent / 'tests/structure_data'
-    target = structure_data / 'gdpr_export.tar.gz'
-
-    assert target.exists(), target
-
-    assert not isinstance(target, TarPath)  # just in case
-
-    tar: Path = CPath(target)
-    assert isinstance(tar, TarPath)
-
-    tar = TarPath(tar)  # should support double wrappping
-    assert isinstance(tar, TarPath)
-    assert isinstance(tar, Path)
-
-    assert tar.exists()
-
-    # TODO what should tar.name return? tar.gz filename??
-    assert str(tar) == str(target)
-
-    [subdir] = tar.iterdir()
-
-    assert isinstance(subdir, TarPath)
-    assert isinstance(subdir, Path)
-
-    hash(subdir)  # shouldn't crash
-
-    ## make sure comparisons work
-    assert subdir == tar / 'gdpr_export'
-    assert subdir != tar
-    ##
-
-    parent = subdir.parent
-    assert isinstance(parent, TarPath)
-    assert parent == tar
-
-    assert subdir.name == 'gdpr_export'
-    assert str(subdir) == str(target / 'gdpr_export')
-    assert tar.is_dir()  # TODO not sure about this.. maybe it should return both is_file and is_dir?
-
-    whatever = subdir / 'whatever'
-    assert whatever.name == 'whatever'
-    assert not whatever.exists()
-
-    messages = subdir / 'messages'
-    assert messages.is_dir()
-
-    assert messages.parts == (*target.parts, 'gdpr_export', 'messages')
-
-    assert messages < subdir / 'profile'  # supports ordering
-
-    index = messages / 'index.csv'
-    assert index.is_file()
-    assert index.exists()
-
-    data = index.read_bytes()
-    assert data == b'test message\n'
-
-    text = index.read_text()
-    assert text == 'test message\n'
-
-    with index.open('rb') as fo:
-        assert fo.read() == b'test message\n'
-
-    with index.open() as fo:
-        assert fo.read() == 'test message\n'
-
-
+# TODO migrate this into tests/archive_path.py too, with generated archives containing leading "./" members.
 def test_tar_dir_leading_dot() -> None:
     """
     Test for 'flat' tar file, when it has leading dots in paths
@@ -349,21 +279,33 @@ def test_tar_dir_leading_dot() -> None:
     structure_data: Path = Path(__file__).parent / 'tests/structure_data'
     target = structure_data / 'with_leading_dot.tar.gz'
 
+    # Fixture precondition for the checked-in leading-dot archive; not behavioral coverage.
     assert target.exists(), target
 
     cpath = CPath(target)
 
+    # Missing-path behavior is covered by tests/archive_path.py::test_file_type_methods[tar.gz].
+    # This assert also exercises the leading "./" normalization unique to this fixture.
     assert not (cpath / 'whatever').exists()
+    # Not covered elsewhere; archive_path.py generates normalized names, while this fixture stores "./c/hello".
     assert (cpath / Path('c', 'hello')).exists()
+    # Read behavior is covered by tests/archive_path.py::test_file_read_modes[tar.gz].
+    # This assert also exercises the leading "./" normalization unique to this fixture.
     assert (cpath / 'b.txt').read_text() == 'contents\n'
 
+    # Iterdir is covered by tests/archive_path.py::test_tree_navigation[tar.gz].
+    # This fixture-specific check makes sure leading "./" entries show up as normal root children.
     assert sorted(cpath.iterdir()) == [cpath / 'a', cpath / 'b.txt', cpath / 'c']
 
+    # Glob behavior is covered by tests/archive_path.py::test_parent_joinpath_glob[tar.gz].
+    # These exact patterns against leading "./" normalized names are only covered here.
     assert list(cpath.glob('h*')) == []
     assert list(cpath.glob('b.txt')) == [cpath / 'b.txt']
     assert list((cpath / 'b.txt').glob('*')) == []
     assert list((cpath / 'c').glob('h*')) == [cpath / 'c' / 'hello']
 
+    # Rglob behavior is covered by tests/archive_path.py::test_rglob_patterns[tar.gz-*].
+    # These exact patterns against leading "./" normalized names are only covered here.
     assert list(cpath.rglob('b.txt')) == [cpath / 'b.txt']
     assert list(cpath.rglob('h*')) == [cpath / 'c/hello']
     assert list(cpath.rglob('c')) == [cpath / 'c']

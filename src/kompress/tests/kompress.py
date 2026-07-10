@@ -1,14 +1,14 @@
+import bz2
 import gzip
 import io
 import lzma
 import sys
-import tarfile
 import zipfile
 from pathlib import Path
 
 import pytest
 
-from .. import CPath, Ext, is_compressed
+from .. import TAR_EXTENSIONS, CPath, Ext, is_compressed
 
 structure_data: Path = Path(__file__).parent / "structure_data"
 
@@ -17,8 +17,10 @@ structure_data: Path = Path(__file__).parent / "structure_data"
     ('filename', 'expected'),
     [
         ('file'    , 'just plaintext'),
+        ('file.bz2', 'compressed text'),
         ('file.xz' , 'compressed text'),
         ('file.zst', 'compressed text'),
+        ('file.zstd', 'compressed text'),
         ('file.gz' , 'compressed text'),
         ('file.lz4', 'compressed text'),
     ],
@@ -115,6 +117,10 @@ def prepare_data(tmp_path: Path):
         with lzma.open(f, 'w') as lzf:
             lzf.write(compressed_text)
 
+    # bz2
+    with bz2.open(tmp_path / 'file.bz2', 'wb') as f:
+        f.write(compressed_text)
+
     # zstd
     if sys.version_info >= (3, 14):
         from compression import zstd
@@ -145,14 +151,12 @@ def prepare_data(tmp_path: Path):
     with zipfile.ZipFile(tmp_path / 'file.zip', 'w') as zf:
         zf.writestr('path/in/archive', 'data in zip')
 
-    with tarfile.open(tmp_path / 'file.tar.gz', 'w:gz') as tf:
-        info = tarfile.TarInfo('file')
-        info.size = len(compressed_text)
-        tf.addfile(info, io.BytesIO(compressed_text))
-
     # make sure all supported extensions are covered by test
     for name, suffix in vars(Ext).items():
         if name.startswith('_') or not isinstance(suffix, str):
+            continue
+        if suffix in TAR_EXTENSIONS:
+            # Tar-like suffixes are covered in archive_path.py with real archives.
             continue
         path = tmp_path / f'file{suffix}'
         assert path.exists(), suffix

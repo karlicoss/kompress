@@ -1,13 +1,14 @@
 """
 Shared archive-path tests.
 
-These cases are expected to pass for regular directories, ZIP archives, and tar.gz archives.
+These cases are expected to pass for regular directories, ZIP archives, and tar-style archives.
 Format-specific edge cases belong next to the corresponding path implementation instead.
 """
 
 from __future__ import annotations
 
 import io
+import sys
 import tarfile
 import zipfile
 from collections.abc import Callable
@@ -15,13 +16,22 @@ from pathlib import Path
 
 import pytest
 
-from .. import CPath, TarPath, ZipPath
-
-structure_data: Path = Path(__file__).parent / "structure_data"
-
+from .. import CPath, TarPath, ZipPath, is_compressed
 
 ArchiveEntries = dict[str, bytes | None]
-GDPR_EXPORT_KINDS = ['directory', 'zip', 'tar.gz']
+
+TAR_WRITE_MODES = {
+    'tar'     : 'w',
+    'tgz'     : 'w:gz',
+    'tar.gz'  : 'w:gz',
+    'tar.bz2' : 'w:bz2',
+    'tar.xz'  : 'w:xz',
+}  # fmt: skip
+if sys.version_info[:2] >= (3, 14):
+    TAR_WRITE_MODES['tar.zst'] = 'w|zst'
+
+TAR_ARCHIVE_KINDS = list(TAR_WRITE_MODES)
+GDPR_EXPORT_KINDS = ['directory', 'zip', *TAR_ARCHIVE_KINDS]
 
 
 GDPR_EXPORT_ENTRIES: ArchiveEntries = {
@@ -55,8 +65,9 @@ def _write_archive(target: Path, kind: str, entries: ArchiveEntries) -> Path:
                     z.writestr(name.rstrip('/') + '/', '')
                 else:
                     z.writestr(name, data)
-    elif kind == 'tar.gz':
-        with tarfile.open(target, 'w:gz') as t:
+    elif kind in TAR_WRITE_MODES:
+        # Type checkers can't narrow the mode after a dict lookup, but all values are valid tarfile modes.
+        with tarfile.open(target, TAR_WRITE_MODES[kind]) as t:  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]
             for name, data in entries.items():
                 if data is None:
                     info = tarfile.TarInfo(name.rstrip('/'))
@@ -66,6 +77,8 @@ def _write_archive(target: Path, kind: str, entries: ArchiveEntries) -> Path:
                     info.size = len(data)
 
                 info.mode = 0o755 if data is None else 0o644
+                # Keep generated tar entries away from the epoch so stat timestamp tests catch real member metadata.
+                info.mtime = 1625100000
                 if data is None:
                     t.addfile(info)
                 else:
@@ -81,7 +94,7 @@ def _gdpr_export_target(kind: str, tmp_path: Path) -> Path:
     if kind == 'directory':
         return _write_directory(tmp_path / 'gdpr_export_directory', GDPR_EXPORT_ENTRIES)
 
-    target = structure_data / f'gdpr_export.{kind}'
+    target = _write_archive(tmp_path / f'gdpr_export.{kind}', kind, GDPR_EXPORT_ENTRIES)
     assert target.exists(), target  # precondition
     return target
 
@@ -93,7 +106,7 @@ def _normalized_walk(root: Path) -> list[tuple[Path, list[str], list[str]]]:
     return sorted((r.relative_to(root), sorted(dirs), sorted(files)) for r, dirs, files in root.walk())
 
 
-@pytest.fixture(params=['directory', 'zip', 'tar.gz'])
+@pytest.fixture(params=GDPR_EXPORT_KINDS)
 def path_factory(request: pytest.FixtureRequest, tmp_path: Path) -> Callable[[ArchiveEntries], Path]:
     kind = request.param
 
@@ -129,9 +142,9 @@ def test_file_read_modes(gdpr_export: Path) -> None:
 @pytest.mark.parametrize(
     ('kind', 'path_type'),
     [
-        pytest.param('directory', CPath  , id='directory'),
-        pytest.param('zip'      , ZipPath, id='zip'),
-        pytest.param('tar.gz'   , TarPath, id='tar.gz'),
+        pytest.param  ('directory', CPath  , id='directory'),
+        pytest.param  ('zip'      , ZipPath, id='zip'      ),
+        *(pytest.param(kind       , TarPath, id=kind       ) for kind in TAR_ARCHIVE_KINDS),
     ],
 )  # fmt: skip
 def test_cpath_existing_path_dispatch(
@@ -140,6 +153,8 @@ def test_cpath_existing_path_dispatch(
     path_type: type[Path],
 ) -> None:
     target = _gdpr_export_target(kind, tmp_path)
+    if kind != 'directory':
+        assert is_compressed(target)
 
     cpath = CPath(target)
     assert isinstance(cpath, path_type)
@@ -155,9 +170,9 @@ def test_cpath_existing_path_dispatch(
 @pytest.mark.parametrize(
     ('kind', 'path_type'),
     [
-        pytest.param('directory', Path   , id='directory'),
-        pytest.param('zip'      , ZipPath, id='zip'),
-        pytest.param('tar.gz'   , TarPath, id='tar.gz'),
+        pytest.param  ('directory', Path   , id='directory'),
+        pytest.param  ('zip'      , ZipPath, id='zip'      ),
+        *(pytest.param(kind       , TarPath, id=kind       ) for kind in TAR_ARCHIVE_KINDS),
     ],
 )  # fmt: skip
 def test_pathlib_compatibility(
@@ -170,7 +185,7 @@ def test_pathlib_compatibility(
     if kind == 'zip':
         archive = ZipPath(target)
         ZipPath(archive)  # make sure double wrapping doesn't crash
-    elif kind == 'tar.gz':
+    elif kind in TAR_ARCHIVE_KINDS:
         archive = TarPath(target)
         TarPath(archive)  # make sure double wrapping doesn't crash
     else:
@@ -355,6 +370,21 @@ def test_tree_navigation(gdpr_export: Path) -> None:
     assert all(isinstance(p, archive_path_type) for p in iterdir_res)
 
 
+def test_path_identity_and_ordering(gdpr_export: Path) -> None:
+    root = gdpr_export / 'gdpr_export'
+    comments = root / 'comments'
+    messages = root / 'messages'
+    profile = root / 'profile'
+
+    assert comments != gdpr_export
+
+    # Shouldn't crash for archive-backed paths.
+    hash(comments)
+
+    assert messages.parts == (*gdpr_export.parts, 'gdpr_export', 'messages')
+    assert messages < profile
+
+
 @pytest.mark.parametrize(
     ('pattern', 'expected'),
     [
@@ -438,7 +468,7 @@ def test_rglob_patterns(
     assert sorted(p.relative_to(root) for p in root.rglob(pattern)) == [Path(p) for p in expected]
 
 
-@pytest.mark.parametrize('filename', ['missing.zip', 'missing.tar.gz'])
+@pytest.mark.parametrize('filename', ['missing.zip', *(f'missing.{kind}' for kind in TAR_ARCHIVE_KINDS)])
 def test_missing_archive_is_cpath(tmp_path: Path, filename: str) -> None:
     target = tmp_path / filename
 
@@ -454,7 +484,7 @@ def test_missing_archive_is_cpath(tmp_path: Path, filename: str) -> None:
     ('path_type', 'filename'),
     [
         (ZipPath, 'missing.zip'),
-        (TarPath, 'missing.tar.gz'),
+        *((TarPath, f'missing.{kind}') for kind in TAR_ARCHIVE_KINDS),
     ],
 )
 def test_missing_archive_path_falls_back_to_regular_path(
