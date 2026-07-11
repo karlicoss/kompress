@@ -43,6 +43,9 @@ def test_cpath_regular(filename: str, expected: str, tmp_path: Path) -> None:
     with CPath(path).open('r', encoding='utf8') as fo:
         assert fo.read() == expected
 
+    with CPath(path).open('r', -1, 'utf-8', 'strict', '\n') as fo:
+        assert fo.read() == expected
+
     with CPath(path).open('rb') as fo:
         assert fo.read() == expected.encode('ascii')
 

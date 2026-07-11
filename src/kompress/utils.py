@@ -13,7 +13,7 @@ from typing import Protocol, Self
 
 
 def check_read_mode(*, mode: str, path: object) -> None:
-    if set(mode) & set('wax+'):
+    if mode not in {'r', 'rt', 'tr', 'rb', 'br'}:
         raise ValueError(f"{type(path).__name__}.open() does not support mode {mode!r}")
 
 

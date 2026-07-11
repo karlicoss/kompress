@@ -4,6 +4,7 @@ import io
 import os
 import sys
 import tarfile
+import warnings
 from collections.abc import Generator, Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -192,14 +193,25 @@ class TarPath(Path):
     def __truediv__(self, key: str | os.PathLike[str]) -> TarPath:
         return self.joinpath(key)
 
-    def open(self, mode: str = 'r', **kwargs):  # type: ignore[override]  # ty: ignore[invalid-method-override]
+    def open(
+        self,
+        mode: str = 'r',
+        buffering: int = -1,
+        encoding: str | None = None,
+        errors: str | None = None,
+        newline: str | None = None,
+    ):
         check_read_mode(mode=mode, path=self)
+        if buffering not in {-1, 0}:
+            warnings.warn(f"while opening {self}: TarPath doesn't support buffering", stacklevel=2)
         extracted = self.tar.extractfile(self.node.info)
         assert extracted is not None
         if 'b' in mode:  # meh
+            if encoding is not None or errors is not None or newline is not None:
+                raise ValueError("binary mode doesn't take encoding, errors, or newline arguments")
             return extracted
         else:
-            return io.TextIOWrapper(extracted, encoding=kwargs.get('encoding'))
+            return io.TextIOWrapper(extracted, encoding=encoding, errors=errors, newline=newline)
 
     @staticmethod
     def _make_args(path: Path) -> tuple[TarFile, Nodes, Node]:

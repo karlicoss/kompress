@@ -150,8 +150,24 @@ def test_file_read_modes(gdpr_export: Path) -> None:
     assert path.read_bytes() == b'test message\n'
 
     assert path.open(mode='rb').read() == b'test message\n'
+    assert path.open(mode='br').read() == b'test message\n'
     assert path.open(mode='r').read() == 'test message\n'
     assert path.open(mode='rt').read() == 'test message\n'
+    assert path.open(mode='tr').read() == 'test message\n'
+
+
+def test_open_positional_arguments_match_pathlib(gdpr_export: Path) -> None:
+    path = gdpr_export / 'gdpr_export/messages/index.csv'
+
+    with path.open('r', -1, 'utf-8', 'strict', '\n') as f:
+        assert f.read() == 'test message\n'
+
+
+def test_open_positional_text_options(path_factory: Callable[[ArchiveEntries], Path]) -> None:
+    path = path_factory({'file': b'\xff\r\n'}) / 'file'
+
+    with path.open('r', -1, 'utf-8', 'replace', '') as f:
+        assert f.read() == '\N{REPLACEMENT CHARACTER}\r\n'
 
 
 @pytest.mark.parametrize('kind', ['zip', 'tar'])
