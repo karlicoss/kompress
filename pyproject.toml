@@ -3,7 +3,7 @@
 dynamic = ["version"]  # version is managed by build backend
 name = "kompress"
 dependencies = [
-    "typing_extensions",
+    "typing_extensions; python_version < '3.13'",
 ]
 requires-python = ">=3.12"
 
