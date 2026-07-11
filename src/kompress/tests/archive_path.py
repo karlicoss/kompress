@@ -45,6 +45,21 @@ GDPR_EXPORT_ENTRIES: ArchiveEntries = {
 }  # fmt: skip
 
 
+PATTERN_ENTRIES: ArchiveEntries = {
+    'root/'                       : None,
+    'root/empty_dir/'             : None,
+    'root/file.txt'               : b'file',
+    'root/aaa/'                   : None,
+    'root/aaa/bbb.txt'            : b'bbb',
+    'root/aaa/ccc/'               : None,
+    'root/aaa/ccc/ddd.json'       : b'{}',
+    'root/messages/'              : None,
+    'root/messages/index.csv'     : b'index',
+    'root/profile/'               : None,
+    'root/profile/settings.json'  : b'{}',
+}  # fmt: skip
+
+
 def _write_directory(target: Path, entries: ArchiveEntries) -> Path:
     target.mkdir()
     for name, data in entries.items():
@@ -217,6 +232,32 @@ def test_dot_segments(gdpr_export: Path) -> None:
     assert (gdpr_export / 'gdpr_export' / './comments').exists()
 
 
+def test_implicit_parent_directories(path_factory: Callable[[ArchiveEntries], Path]) -> None:
+    """
+    Archive formats can store a nested file without separate entries for its parent directories.
+    Archive-backed paths should synthesize those directories and expose the same tree as pathlib.
+    """
+    archive = path_factory(
+        {
+            'nested/deeper/file.txt': b'data',
+        }
+    )
+
+    nested = archive / 'nested'
+    deeper = nested / 'deeper'
+    file = deeper / 'file.txt'
+
+    assert nested.is_dir()
+    assert deeper.is_dir()
+    assert file.is_file()
+    assert file.read_bytes() == b'data'
+    assert _normalized_walk(archive) == [
+        (Path()               , ['nested'], []),
+        (Path('nested')       , ['deeper'], []),
+        (Path('nested/deeper'), []        , ['file.txt']),
+    ]  # fmt: skip
+
+
 def test_walk_empty(path_factory: Callable[[ArchiveEntries], Path]) -> None:
     archive = path_factory({})
 
@@ -307,6 +348,16 @@ def test_parent_joinpath_glob(gdpr_export: Path) -> None:
     assert all(isinstance(p, archive_path_type) for p in matched)
 
 
+def test_glob_star_is_not_recursive(gdpr_export: Path) -> None:
+    root = gdpr_export / 'gdpr_export'
+
+    assert sorted(path.relative_to(root) for path in root.glob('*')) == [
+        Path('comments'),
+        Path('messages'),
+        Path('profile'),
+    ]
+
+
 def test_file_type_methods(gdpr_export: Path) -> None:
     assert gdpr_export.exists()
     assert gdpr_export.is_dir()
@@ -388,6 +439,111 @@ def test_path_identity_and_ordering(gdpr_export: Path) -> None:
 @pytest.mark.parametrize(
     ('pattern', 'expected'),
     [
+        ('*'          , ['aaa', 'empty_dir', 'file.txt', 'messages', 'profile']),
+        ('*.txt'      , ['file.txt']),
+        ('aaa/*'      , ['aaa/bbb.txt', 'aaa/ccc']),
+        ('*/*.json'   , ['profile/settings.json']),
+        ('**/*.json'  , ['aaa/ccc/ddd.json', 'profile/settings.json']),
+        ('**/file.txt', ['file.txt']),
+        ('*/'         , ['aaa', 'empty_dir', 'messages', 'profile']),
+    ],
+)  # fmt: skip
+def test_glob_patterns(
+    path_factory: Callable[[ArchiveEntries], Path],
+    pattern: str,
+    expected: list[str],
+) -> None:
+    root = path_factory(PATTERN_ENTRIES) / 'root'
+
+    assert sorted(p.relative_to(root) for p in root.glob(pattern)) == [Path(p) for p in expected]
+
+
+@pytest.mark.parametrize(
+    ('method', 'expected'),
+    [
+        ('glob' , ['file.txt']),
+        ('rglob', ['aaa/bbb.txt', 'file.txt']),
+    ],
+)  # fmt: skip
+def test_pathlike_glob_pattern(
+    path_factory: Callable[[ArchiveEntries], Path],
+    method: str,
+    expected: list[str],
+) -> None:
+    """Archive paths accept path-like glob patterns on every supported Python version."""
+    root = path_factory(PATTERN_ENTRIES) / 'root'
+    if not isinstance(root, (TarPath, ZipPath)) and sys.version_info[:2] < (3, 13):
+        pytest.skip('pathlib.Path requires Python 3.13+ for path-like glob patterns')
+
+    matches = getattr(root, method)(Path('*.txt'))
+    assert sorted(p.relative_to(root) for p in matches) == [Path(p) for p in expected]
+
+
+@pytest.mark.parametrize(
+    ('method', 'pattern', 'expected_before_313', 'expected_from_313'),
+    [
+        (
+            'glob',
+            '**',
+            ['.', 'aaa', 'aaa/ccc', 'empty_dir', 'messages', 'profile'],
+            [
+                '.',
+                'aaa',
+                'aaa/bbb.txt',
+                'aaa/ccc',
+                'aaa/ccc/ddd.json',
+                'empty_dir',
+                'file.txt',
+                'messages',
+                'messages/index.csv',
+                'profile',
+                'profile/settings.json',
+            ],
+        ),
+        (
+            'glob',
+            'aaa/**',
+            ['aaa', 'aaa/ccc'],
+            ['aaa', 'aaa/bbb.txt', 'aaa/ccc', 'aaa/ccc/ddd.json'],
+        ),
+        (
+            'rglob',
+            '**',
+            ['.', 'aaa', 'aaa/ccc', 'empty_dir', 'messages', 'profile'],
+            [
+                '.',
+                'aaa',
+                'aaa/bbb.txt',
+                'aaa/ccc',
+                'aaa/ccc/ddd.json',
+                'empty_dir',
+                'file.txt',
+                'messages',
+                'messages/index.csv',
+                'profile',
+                'profile/settings.json',
+            ],
+        ),
+    ],
+)
+def test_terminal_recursive_glob(
+    path_factory: Callable[[ArchiveEntries], Path],
+    method: str,
+    pattern: str,
+    expected_before_313: list[str],
+    expected_from_313: list[str],
+) -> None:
+    """A terminal ``**`` also matches files starting with Python 3.13."""
+    root = path_factory(PATTERN_ENTRIES) / 'root'
+    expected = expected_from_313 if sys.version_info[:2] >= (3, 13) else expected_before_313
+
+    matches = getattr(root, method)(pattern)
+    assert sorted(p.relative_to(root) for p in matches) == [Path(p) for p in expected]
+
+
+@pytest.mark.parametrize(
+    ('pattern', 'expected'),
+    [
         (
             '*',
             [
@@ -450,22 +606,15 @@ def test_rglob_patterns(
     pattern: str,
     expected: list[str],
 ) -> None:
-    entries: ArchiveEntries = {
-        'root/'                       : None,
-        'root/empty_dir/'             : None,
-        'root/file.txt'               : b'file',
-        'root/aaa/'                   : None,
-        'root/aaa/bbb.txt'            : b'bbb',
-        'root/aaa/ccc/'               : None,
-        'root/aaa/ccc/ddd.json'       : b'{}',
-        'root/messages/'              : None,
-        'root/messages/index.csv'     : b'index',
-        'root/profile/'               : None,
-        'root/profile/settings.json'  : b'{}',
-    }  # fmt: skip
-    root = path_factory(entries)
+    root = path_factory(PATTERN_ENTRIES)
 
     assert sorted(p.relative_to(root) for p in root.rglob(pattern)) == [Path(p) for p in expected]
+
+
+def test_rglob_from_subdirectory(path_factory: Callable[[ArchiveEntries], Path]) -> None:
+    root = path_factory(PATTERN_ENTRIES) / 'root' / 'aaa'
+
+    assert [p.relative_to(root) for p in root.rglob('*.json')] == [Path('ccc/ddd.json')]
 
 
 @pytest.mark.parametrize('filename', ['missing.zip', *(f'missing.{kind}' for kind in TAR_ARCHIVE_KINDS)])

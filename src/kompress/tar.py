@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import fnmatch
 import io
 import os
 import sys
@@ -11,7 +10,7 @@ from pathlib import Path
 from tarfile import TarFile, TarInfo
 from typing import Self
 
-from .utils import walk_paths
+from .utils import archive_glob, walk_paths
 
 
 @dataclass(slots=True)
@@ -21,7 +20,8 @@ class Node:
 
     @property
     def name(self) -> str:
-        return self.info.name.rsplit('/', maxsplit=1)[-1]
+        # Tar directory entries may retain a trailing '/', which would otherwise make their name empty.
+        return self.info.name.rstrip('/').rsplit('/', maxsplit=1)[-1]
 
 
 Nodes = dict[str, Node]
@@ -167,27 +167,11 @@ class TarPath(Path):
                 follow_symlinks=follow_symlinks,
             )
 
-    def glob(self, pattern: str, **kwargs) -> Iterator[TarPath]:  # type: ignore[override, unused-ignore]  # ty: ignore[invalid-method-override]  # noqa: ARG002
-        parts = self._rpath.parts
-        prefix = '' if len(parts) == 0 else ('/'.join(parts) + '/')
-        full_pattern = prefix + pattern
-        for p, node in self._nodes.items():
-            if not fnmatch.fnmatch(p, full_pattern):
-                continue
-            rpath = Path(*p.split('/'))
-            yield TarPath(tar=self.tar, _nodes=self._nodes, _rpath=rpath, _node=node)
+    def glob(self, pattern: str | os.PathLike[str], **kwargs) -> Iterator[TarPath]:  # type: ignore[override, unused-ignore]  # ty: ignore[invalid-method-override]
+        yield from archive_glob(self, pattern, recursive=False, **kwargs)
 
-    def rglob(self, pattern: str, **kwargs) -> Iterator[TarPath]:  # type: ignore[override, unused-ignore]  # ty: ignore[invalid-method-override]  # noqa: ARG002
-        parts = self._rpath.parts
-        prefix = '' if len(parts) == 0 else ('/'.join(parts) + '/')
-        for p, node in self._nodes.items():
-            if not p.startswith(prefix):
-                continue
-            rest = p[len(prefix) :]
-            if rest == '' or not Path(rest).match(pattern):
-                continue
-            rpath = Path(*p.split('/'))
-            yield TarPath(tar=self.tar, _nodes=self._nodes, _rpath=rpath, _node=node)
+    def rglob(self, pattern: str | os.PathLike[str], **kwargs) -> Iterator[TarPath]:  # type: ignore[override, unused-ignore]  # ty: ignore[invalid-method-override]
+        yield from archive_glob(self, pattern, recursive=True, **kwargs)
 
     def relative_to(self, other: TarPath, *extra: str | os.PathLike[str]) -> Path:  # type: ignore[override]  # ty: ignore[invalid-method-override]
         assert _tarpath(self.tar) == _tarpath(other.tar), (_tarpath(self.tar), _tarpath(other.tar))
@@ -223,22 +207,33 @@ class TarPath(Path):
         sep = '/'  # note: doesn't really matter which separator is used here, this is just within this function
 
         members = tf.getmembers()
-        paths = []
-        infos = {}
+        infos: dict[str, TarInfo] = {}
         for m in members:
-            is_dir = m.isdir()
-
             norm_name = m.name
-            if norm_name == '.':
+            while norm_name.startswith('./'):
+                # Archives created against the current directory often prefix every member with "./".
+                norm_name = norm_name[2:]
+            if m.isdir():
+                norm_name = norm_name.rstrip('/')
+            if norm_name in {'', '.'}:
                 # sometimes root is included? we don't need it for walk_paths
                 continue
-            if norm_name[:2] == './':
-                # sometimes archive is created against current dir (.), this ends up with awkward dots in the index...
-                norm_name = norm_name[2:]
 
-            p = norm_name + (sep if is_dir else '')
-            paths.append(p)
             infos[norm_name] = m
+
+            # Tar archives need not contain explicit entries for parent directories.
+            # Synthesize them so a member such as "nested/file" still produces a navigable tree.
+            parts = norm_name.split(sep)
+            for end in range(1, len(parts)):
+                parent = sep.join(parts[:end])
+                if parent in infos:
+                    continue
+                parent_info = TarInfo(name=parent)
+                parent_info.type = tarfile.DIRTYPE
+                infos[parent] = parent_info
+
+        # walk_paths expects a depth-first-compatible order and explicit directory entries.
+        paths = sorted(f'{name}{sep}' if info.isdir() else name for name, info in infos.items())
 
         nodes: dict[str, Node] = {}
 
