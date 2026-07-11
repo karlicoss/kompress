@@ -59,6 +59,15 @@ def test_cpath_regular(filename: str, expected: str, tmp_path: Path) -> None:
         assert CPath(*args).read_text() == expected  # type: ignore[misc]
 
 
+@pytest.mark.parametrize('mode', ['w', 'a', 'x', 'r+'])
+def test_cpath_rejects_write_modes(tmp_path: Path, mode: str) -> None:
+    path = tmp_path / 'file'
+
+    with pytest.raises(ValueError) as exc:
+        CPath(path).open(mode)
+    assert str(exc.value) == f"CPath.open() does not support mode {mode!r}"
+
+
 def test_gz(tmp_path: Path) -> None:
     gzf = tmp_path / 'file.gz'
     with gzip.open(gzf, 'wb') as f:

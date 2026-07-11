@@ -11,7 +11,7 @@ from functools import total_ordering
 from pathlib import Path
 from typing import Self
 
-from .utils import archive_glob, walk_paths
+from .utils import archive_glob, check_read_mode, walk_paths
 
 
 def _without_dot_segments(at: str) -> str:
@@ -130,6 +130,10 @@ class ZipPath(zipfile.Path):
     def iterdir(self) -> Iterator[ZipPath]:
         for s in self._as_dir().iterdir():
             yield ZipPath(s.root, s.at)
+
+    def open(self, mode='r', *args, **kwargs):
+        check_read_mode(mode=mode, path=self)
+        return super().open(mode, *args, **kwargs)
 
     @property
     def stem(self) -> str:

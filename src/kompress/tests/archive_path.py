@@ -154,6 +154,17 @@ def test_file_read_modes(gdpr_export: Path) -> None:
     assert path.open(mode='rt').read() == 'test message\n'
 
 
+@pytest.mark.parametrize('kind', ['zip', 'tar'])
+@pytest.mark.parametrize('mode', ['w', 'a', 'x', 'r+'])
+def test_archive_paths_reject_write_modes(tmp_path: Path, kind: str, mode: str) -> None:
+    archive = CPath(_write_archive(tmp_path / f'archive.{kind}', kind, {'file': b'data'}))
+    path = archive / 'file'
+
+    with pytest.raises(ValueError) as exc:
+        path.open(mode)
+    assert str(exc.value) == f"{type(path).__name__}.open() does not support mode {mode!r}"
+
+
 @pytest.mark.parametrize(
     ('kind', 'path_type'),
     [

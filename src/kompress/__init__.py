@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import IO, TYPE_CHECKING
 
 from .tar import TarPath
+from .utils import check_read_mode
 from .zip import ZipPath
 
 
@@ -77,6 +78,7 @@ class CPath(Path):
         errors: str | None = None,
         **kwargs,
     ):
+        check_read_mode(mode=mode, path=self)
         if buffering not in {-1, 0}:
             # buffering is unsupported by most compressed formats
             # -1 is 'default', 0 means 'buffering off' (pathlib passes it since 3.14)
@@ -92,9 +94,6 @@ class CPath(Path):
 
 
 def _cpath_open(*, path: Path | str, mode: str, **kwargs) -> IO:
-    if 'w' in mode:
-        raise RuntimeError(f"Trying to open {path} in {mode=}. CPath only supports reading.")
-
     pp = Path(path)
     if not pp.exists():
         # Let pathlib raise its native FileNotFoundError instead of dispatching on the compression suffix.

@@ -10,7 +10,7 @@ from pathlib import Path
 from tarfile import TarFile, TarInfo
 from typing import Self
 
-from .utils import archive_glob, walk_paths
+from .utils import archive_glob, check_read_mode, walk_paths
 
 
 @dataclass(slots=True)
@@ -193,6 +193,7 @@ class TarPath(Path):
         return self.joinpath(key)
 
     def open(self, mode: str = 'r', **kwargs):  # type: ignore[override]  # ty: ignore[invalid-method-override]
+        check_read_mode(mode=mode, path=self)
         extracted = self.tar.extractfile(self.node.info)
         assert extracted is not None
         if 'b' in mode:  # meh
