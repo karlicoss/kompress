@@ -9,7 +9,7 @@ from functools import total_ordering
 from pathlib import Path
 from typing import Self
 
-from .utils import walk_paths
+from .utils import archive_glob, walk_paths
 
 
 def _without_dot_segments(at: str) -> str:
@@ -92,12 +92,11 @@ class ZipPath(zipfile.Path):
     def _next(self, at: str) -> ZipPath:
         return ZipPath(self.root, at)
 
-    def rglob(self, pattern: str) -> Iterator[ZipPath]:
-        # note: not 100% sure about the correctness, but seem fine?
-        # Path.match() matches from the right, so need to
-        rpaths = (p for p in self.root.namelist() if p.startswith(self.at))
-        rpaths = (p for p in rpaths if Path(p).match(pattern))
-        return (ZipPath(self.root, p) for p in rpaths)
+    def glob(self, pattern: str | os.PathLike[str], **kwargs) -> Iterator[ZipPath]:
+        yield from archive_glob(self, pattern, recursive=False, **kwargs)
+
+    def rglob(self, pattern: str | os.PathLike[str], **kwargs) -> Iterator[ZipPath]:
+        yield from archive_glob(self, pattern, recursive=True, **kwargs)
 
     def relative_to(self, other: ZipPath, *extra: str | os.PathLike[str]) -> Path:  # type: ignore[override]  # ty: ignore[invalid-method-override]
         assert self.filepath == other.filepath, (self.filepath, other.filepath)

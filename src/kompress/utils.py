@@ -4,9 +4,87 @@ Helper utils for zippath adapter
 
 from __future__ import annotations
 
+import fnmatch
 import os
+import sys
 from collections.abc import Iterable, Iterator
 from pathlib import Path
+from typing import Protocol, Self
+
+
+class _GlobPath(Protocol):
+    @property
+    def name(self) -> str: ...
+
+    def is_dir(self) -> bool: ...
+
+    def iterdir(self) -> Iterator[Self]: ...
+
+
+def archive_glob[GlobPathT: _GlobPath](
+    root: GlobPathT,
+    pattern: str | os.PathLike[str],
+    *,
+    recursive: bool,
+    **kwargs,
+) -> Iterator[GlobPathT]:
+    case_sensitive: bool | None = kwargs.pop('case_sensitive', None)
+    kwargs.pop('recurse_symlinks', False)
+    if kwargs:
+        unexpected = next(iter(kwargs))
+        raise TypeError(f"glob() got an unexpected keyword argument {unexpected!r}")
+
+    pattern_str = os.fspath(pattern)
+    if pattern_str == '':
+        raise ValueError("Unacceptable pattern: ''")
+
+    pattern_path = Path(pattern_str)
+    if pattern_path.is_absolute():
+        raise NotImplementedError("Non-relative patterns are unsupported")
+
+    # Repeating os.sep when os.altsep is unavailable avoids platform-specific optional typing.
+    separators = (os.sep, os.altsep or os.sep)
+    directory_only = pattern_str.endswith(separators)
+    pattern_parts = pattern_path.parts
+    if recursive:
+        pattern_parts = ('**', *pattern_parts)
+
+    def matches(name: str, part: str) -> bool:
+        if case_sensitive is None:
+            return fnmatch.fnmatch(name, part)
+        if case_sensitive:
+            return fnmatch.fnmatchcase(name, part)
+        return fnmatch.fnmatchcase(name.casefold(), part.casefold())
+
+    # Each state is handled once, preventing repeated `**` components from doing duplicate work.
+    states: list[tuple[GlobPathT, int]] = [(root, 0)]
+    visited: set[tuple[GlobPathT, int]] = set()
+    while states:
+        current, pattern_pos = states.pop()
+        state = (current, pattern_pos)
+        if state in visited:
+            continue
+        visited.add(state)
+
+        if pattern_pos == len(pattern_parts):
+            if not directory_only or current.is_dir():
+                yield current
+            continue
+        if not current.is_dir():
+            continue
+
+        part = pattern_parts[pattern_pos]
+        children = list(current.iterdir())
+        if part == '**':
+            # Add descendants first so the zero-segment state is popped and handled first.
+            states.extend((child, pattern_pos) for child in reversed(children) if child.is_dir())
+            if pattern_pos == len(pattern_parts) - 1 and sys.version_info[:2] >= (3, 13):
+                # Since Python 3.13, a terminal `**` yields files as well as directories.
+                states.extend((child, pattern_pos + 1) for child in reversed(children))
+            states.append((current, pattern_pos + 1))
+        else:
+            states.extend((child, pattern_pos + 1) for child in reversed(children) if matches(child.name, part))
+
 
 RootName = str
 DirName = str
