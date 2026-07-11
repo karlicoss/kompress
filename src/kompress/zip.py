@@ -131,9 +131,38 @@ class ZipPath(zipfile.Path):
         for s in self._as_dir().iterdir():
             yield ZipPath(s.root, s.at)
 
-    def open(self, mode='r', *args, **kwargs):
+    def open(  # type: ignore[override]  # ty: ignore[invalid-method-override]
+        self,
+        mode: str = 'r',
+        buffering: int = -1,
+        encoding: str | None = None,
+        errors: str | None = None,
+        newline: str | None = None,
+    ):
         check_read_mode(mode=mode, path=self)
-        return super().open(mode, *args, **kwargs)
+        if buffering not in {-1, 0}:
+            warnings.warn(f"while opening {self}: ZipPath doesn't support buffering", stacklevel=2)
+        if mode in {'rb', 'br'}:
+            if encoding is not None or errors is not None or newline is not None:
+                raise ValueError("binary mode doesn't take encoding, errors, or newline arguments")
+            return super().open('rb')
+        return super().open(
+            'r',
+            encoding=encoding,
+            errors=errors,
+            newline=newline,
+        )
+
+    # zipfile.Path.read_text passes encoding as the second positional argument to open().
+    # Our pathlib-compatible open uses that position for buffering, so pass the text options by keyword instead.
+    def read_text(  # type: ignore[override]  # ty: ignore[invalid-method-override]
+        self,
+        encoding: str | None = None,
+        errors: str | None = None,
+        newline: str | None = None,
+    ) -> str:
+        with self.open('r', encoding=encoding, errors=errors, newline=newline) as f:
+            return f.read()
 
     @property
     def stem(self) -> str:

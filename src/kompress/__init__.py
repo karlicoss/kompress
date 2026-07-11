@@ -70,12 +70,13 @@ class CPath(Path):
                 return tar_path
         return super().__new__(cls, *args, **kwargs)
 
-    def open(  # type: ignore[override]  # ty: ignore[invalid-method-override]
+    def open(
         self,
         mode: str = 'r',
         buffering: int = -1,
         encoding: str | None = None,
         errors: str | None = None,
+        newline: str | None = None,
         **kwargs,
     ):
         check_read_mode(mode=mode, path=self)
@@ -86,6 +87,7 @@ class CPath(Path):
         # simply forward the rest of positional args
         kwargs['encoding'] = encoding
         kwargs['errors'] = errors
+        kwargs['newline'] = newline
         return _cpath_open(
             path=str(self),
             mode=mode,
