@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import zipfile
 from pathlib import Path
 from typing import cast
@@ -28,10 +29,10 @@ def test_missing_zip_member_constructor_falls_back_to_regular_path(tmp_path: Pat
     assert not path.exists()
 
 
-def test_zip_stat_uses_archive_file_when_datetime_is_default(tmp_path: Path) -> None:
+def test_zip_stat_uses_archive_timestamps_when_datetime_is_default(tmp_path: Path) -> None:
     """
     ZIP entries can use 1980-01-01 as a placeholder when Python can't read their real timestamp.
-    In that case, ZipPath.stat() falls back to the archive file's stat instead of reporting the placeholder date.
+    In that case, ZipPath.stat() borrows the archive file's timestamps instead of reporting the placeholder date.
     """
     target = tmp_path / 'archive.zip'
     info = zipfile.ZipInfo('file.txt')
@@ -41,4 +42,12 @@ def test_zip_stat_uses_archive_file_when_datetime_is_default(tmp_path: Path) -> 
 
     path = ZipPath(target) / 'file.txt'
 
-    assert path.stat() == target.stat()
+    stat = path.stat()
+    archive_stat = target.stat()
+    assert stat.st_size == len(b'abc')
+    assert stat.st_atime == archive_stat.st_atime
+    assert stat.st_mtime == archive_stat.st_mtime
+    if sys.platform == 'win32':
+        assert stat[9] == archive_stat.st_birthtime
+    else:
+        assert stat.st_ctime == archive_stat.st_ctime
