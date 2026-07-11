@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import posixpath  # zip internal paths always use forward slashes
+import sys
+import warnings
 import zipfile
 from collections.abc import Iterator, Sequence
 from datetime import datetime
@@ -172,14 +174,23 @@ class ZipPath(zipfile.Path):
             #  , but instead uses some OS extension ("Extended Timestamp"?)
             # In particular, that started happening to google takeouts sinse Feb 2024
             # Doesn't look like these are supported for python at the moment, see https://github.com/python/cpython/issues/49707
-            # So the best we can do in that case (which still might be wrong is taking the file's stats instead :( )
-            return self.filepath.stat()
-
-        # TODO: prefer the UT extra field when present, to better match an extracted regular file.
-        # For gdpr_export/comments/comments.json, unzip -l reports 2021-07-01 09:43 from that
-        # extra field, while zipfile exposes the central-directory DOS timestamp as 01:43.
-        dt = datetime(*info.date_time)
-        ts = int(dt.timestamp())
+            # So the best we can do in that case (which still might be wrong) is taking the archive's timestamps.
+            archive_stat = self.filepath.stat()
+            atime = archive_stat.st_atime
+            mtime = archive_stat.st_mtime
+            if sys.platform == 'win32':
+                ctime = archive_stat.st_birthtime
+            else:
+                ctime = archive_stat.st_ctime
+        else:
+            # TODO: prefer the UT extra field when present, to better match an extracted regular file.
+            # For gdpr_export/comments/comments.json, unzip -l reports 2021-07-01 09:43 from that
+            # extra field, while zipfile exposes the central-directory DOS timestamp as 01:43.
+            dt = datetime(*info.date_time)
+            ts = int(dt.timestamp())
+            atime = ts
+            mtime = ts
+            ctime = ts
         params = {
             'st_mode': 0,
             'st_ino': 0,
@@ -188,9 +199,9 @@ class ZipPath(zipfile.Path):
             'st_uid': 1000,
             'st_gid': 1000,
             'st_size': info.file_size,
-            'st_atime': ts,
-            'st_mtime': ts,
-            'st_ctime': ts,
+            'st_atime': atime,
+            'st_mtime': mtime,
+            'st_ctime': ctime,
         }
         return os.stat_result(tuple(params.values()))
 
