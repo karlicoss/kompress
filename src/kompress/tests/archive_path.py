@@ -629,6 +629,15 @@ def test_missing_archive_is_cpath(tmp_path: Path, filename: str) -> None:
     assert not (path / 'path/in/archive').exists()
 
 
+@pytest.mark.parametrize('filename', ['missing.zip', *(f'missing.{kind}' for kind in TAR_ARCHIVE_KINDS)])
+def test_open_missing_archive_raises_file_not_found(tmp_path: Path, filename: str) -> None:
+    target = tmp_path / filename
+
+    with pytest.raises(FileNotFoundError) as exc:
+        CPath(target).open()
+    assert exc.value.filename == str(target)
+
+
 @pytest.mark.parametrize(
     ('path_type', 'filename'),
     [
