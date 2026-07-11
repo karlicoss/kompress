@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import bz2
 import gzip
-import io
 import sys
 import warnings
 from pathlib import Path
@@ -118,16 +117,10 @@ def _cpath_open(*, path: Path | str, mode: str, **kwargs) -> IO:
             # See https://github.com/astral-sh/ty/issues/2681
             import zstandard as zstd  # ty: ignore[unresolved-import,unused-ignore-comment,unused-ignore-comment]
 
-            fh = pp.open('rb')
-            dctx = zstd.ZstdDecompressor()
-            reader = dctx.stream_reader(fh)
+            if mode == 'r':
+                mode = 'rt'
 
-            if mode == 'rb':
-                return reader
-            else:
-                # must be text mode
-                # NOTE: no need to pass mode, TextIOWrapper doesn't like it
-                return io.TextIOWrapper(reader, **kwargs)  # meh
+            return zstd.open(path, mode=mode, **kwargs)
     elif name.endswith(Ext.xz):
         import lzma
 
