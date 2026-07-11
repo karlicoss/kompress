@@ -97,13 +97,11 @@ def _cpath_open(*, path: Path | str, mode: str, **kwargs) -> IO:
         raise RuntimeError(f"Trying to open {path} in {mode=}. CPath only supports reading.")
 
     pp = Path(path)
+    if not pp.exists():
+        # Let pathlib raise its native FileNotFoundError instead of dispatching on the compression suffix.
+        return pp.open(mode=mode, **kwargs)
+
     name = pp.name
-    if name.endswith(Ext.zip):
-        # this should be handled by ZipPath (see CPath.__new__)
-        raise RuntimeError("shouldn't happen")
-    if name.endswith(TAR_EXTENSIONS):
-        # this should be handled by TarPath (see CPath.__new__)
-        raise RuntimeError("shouldn't happen")
     if name.endswith((Ext.zstd, Ext.zst)):
         if sys.version_info[:2] >= (3, 14):
             from compression import zstd
