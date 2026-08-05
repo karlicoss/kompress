@@ -429,10 +429,13 @@ def test_tree_navigation(gdpr_export: Path) -> None:
     archive_path_type = type(gdpr_export)
 
     jsons = [p.relative_to(gdpr_export / 'gdpr_export') for p in gdpr_export.rglob('*.json')]
-    assert jsons == [
+    expected_jsons = [
         Path('comments', 'comments.json'),
         Path('profile', 'settings.json'),
     ]
+    # Filesystem traversal order is unspecified.
+    # Compare sorted lists instead of sets so duplicate results are still detected.
+    assert sorted(jsons) == sorted(expected_jsons)
 
     assert (gdpr_export / 'gdpr_export' / 'comments' / 'comments.json').relative_to(
         gdpr_export / 'gdpr_export',
