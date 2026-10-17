@@ -4,8 +4,9 @@ import bz2
 import gzip
 import sys
 import warnings
+from os import PathLike
 from pathlib import Path
-from typing import IO, TYPE_CHECKING
+from typing import IO, TYPE_CHECKING, Self
 
 from .tar import TarPath
 from .utils import check_read_mode
@@ -55,19 +56,21 @@ class CPath(Path):
     _accessor.open has to return file descriptor, doesn't work for compressed stuff.
     """
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *args: str | PathLike[str], **kwargs: object) -> Self:
         # TODO shortcut if args[0] is already Cpath?
 
         path = Path(*args)
+        # For existing archives, return ZipPath or TarPath instead of a CPath.
+        # Neither class inherits from CPath, hence the return-type ignores below.
         # Missing archive wrappers fall back to plain Path; CPath should stay CPath in that case.
         if path.name.endswith(Ext.zip):
             zip_path = ZipPath(path)
             if isinstance(zip_path, ZipPath):
-                return zip_path
+                return zip_path  # type: ignore[return-value]  # ty: ignore[invalid-return-type]
         if path.name.endswith(TAR_EXTENSIONS):
             tar_path = TarPath(path)
             if isinstance(tar_path, TarPath):
-                return tar_path
+                return tar_path  # type: ignore[return-value]  # ty: ignore[invalid-return-type]
         return super().__new__(cls, *args, **kwargs)
 
     def open(
