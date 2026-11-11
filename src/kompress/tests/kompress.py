@@ -108,7 +108,7 @@ def test_kopen_kexists(tmp_path: Path) -> None:
     """
     Testing deprecations, can remove when we remove kexists/kopen
     """
-    from .. import kexists, kopen  # type: ignore[attr-defined]  # ty: ignore[unresolved-import]
+    from .. import kexists, kopen  # type: ignore[attr-defined]  # ty: ignore[import-not-found]
 
     path = Path(tmp_path / 'file.zip')
 
@@ -142,9 +142,9 @@ def prepare_data(tmp_path: Path):
                 f.write(compressed_text)
     else:
         # ty checks this branch on Python 3.14 even though zstandard is only installed on <3.14.
-        # The duplicated unused-ignore-comment keeps this valid both when unresolved-import is used and unused.
+        # The duplicated unused-ignore-comment keeps this valid both when import-not-found is used and unused.
         # See https://github.com/astral-sh/ty/issues/2681
-        import zstandard as zstd  # ty: ignore[unresolved-import,unused-ignore-comment,unused-ignore-comment]
+        import zstandard as zstd  # ty: ignore[import-not-found,unused-ignore-comment,unused-ignore-comment]
 
         zst_ctx = zstd.ZstdCompressor()
         for suffix in [Ext.zst, Ext.zstd]:
