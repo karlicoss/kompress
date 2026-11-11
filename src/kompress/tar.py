@@ -168,13 +168,13 @@ class TarPath(Path):
                 follow_symlinks=follow_symlinks,
             )
 
-    def glob(self, pattern: str | os.PathLike[str], **kwargs) -> Iterator[TarPath]:  # type: ignore[override, unused-ignore]  # ty: ignore[invalid-method-override]
+    def glob(self, pattern: str | os.PathLike[str], **kwargs) -> Iterator[TarPath]:  # type: ignore[override, unused-ignore]  # ty: ignore[incompatible-method-override]
         yield from archive_glob(self, pattern, recursive=False, **kwargs)
 
-    def rglob(self, pattern: str | os.PathLike[str], **kwargs) -> Iterator[TarPath]:  # type: ignore[override, unused-ignore]  # ty: ignore[invalid-method-override]
+    def rglob(self, pattern: str | os.PathLike[str], **kwargs) -> Iterator[TarPath]:  # type: ignore[override, unused-ignore]  # ty: ignore[incompatible-method-override]
         yield from archive_glob(self, pattern, recursive=True, **kwargs)
 
-    def relative_to(self, other: TarPath, *extra: str | os.PathLike[str]) -> Path:  # type: ignore[override]  # ty: ignore[invalid-method-override]
+    def relative_to(self, other: TarPath, *extra: str | os.PathLike[str]) -> Path:  # type: ignore[override]  # ty: ignore[incompatible-method-override]
         assert _tarpath(self.tar) == _tarpath(other.tar), (_tarpath(self.tar), _tarpath(other.tar))
         return self._rpath.relative_to(other._rpath.joinpath(*extra))
 

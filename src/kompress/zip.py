@@ -100,7 +100,7 @@ class ZipPath(zipfile.Path):
     def rglob(self, pattern: str | os.PathLike[str], **kwargs) -> Iterator[ZipPath]:
         yield from archive_glob(self, pattern, recursive=True, **kwargs)
 
-    def relative_to(self, other: ZipPath, *extra: str | os.PathLike[str]) -> Path:  # type: ignore[override]  # ty: ignore[invalid-method-override]
+    def relative_to(self, other: ZipPath, *extra: str | os.PathLike[str]) -> Path:  # type: ignore[override]  # ty: ignore[incompatible-method-override]
         assert self.filepath == other.filepath, (self.filepath, other.filepath)
         return self.subpath.relative_to(other.subpath.joinpath(*extra))
 
@@ -131,7 +131,7 @@ class ZipPath(zipfile.Path):
         for s in self._as_dir().iterdir():
             yield ZipPath(s.root, s.at)
 
-    def open(  # type: ignore[override]  # ty: ignore[invalid-method-override]
+    def open(  # type: ignore[override]  # ty: ignore[incompatible-method-override]
         self,
         mode: str = 'r',
         buffering: int = -1,
@@ -155,7 +155,7 @@ class ZipPath(zipfile.Path):
 
     # zipfile.Path.read_text passes encoding as the second positional argument to open().
     # Our pathlib-compatible open uses that position for buffering, so pass the text options by keyword instead.
-    def read_text(  # type: ignore[override]  # ty: ignore[invalid-method-override]
+    def read_text(  # type: ignore[override]  # ty: ignore[incompatible-method-override]
         self,
         encoding: str | None = None,
         errors: str | None = None,
