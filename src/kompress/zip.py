@@ -45,7 +45,7 @@ class ZipPath(zipfile.Path):
 
         path = Path(root)
         if not path.exists():
-            return path / at  # type: ignore[return-value]  # ty: ignore[invalid-return-type]
+            return path / at  # type: ignore[return-value]  # ty: ignore[invalid-explicit-return]
 
         return super().__new__(cls)
 

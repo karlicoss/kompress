@@ -66,11 +66,11 @@ class CPath(Path):
         if path.name.endswith(Ext.zip):
             zip_path = ZipPath(path)
             if isinstance(zip_path, ZipPath):
-                return zip_path  # type: ignore[return-value]  # ty: ignore[invalid-return-type]
+                return zip_path  # type: ignore[return-value]  # ty: ignore[invalid-explicit-return]
         if path.name.endswith(TAR_EXTENSIONS):
             tar_path = TarPath(path)
             if isinstance(tar_path, TarPath):
-                return tar_path  # type: ignore[return-value]  # ty: ignore[invalid-return-type]
+                return tar_path  # type: ignore[return-value]  # ty: ignore[invalid-explicit-return]
         return super().__new__(cls, *args, **kwargs)
 
     def open(
@@ -160,7 +160,7 @@ def _cpath_open(*, path: Path | str, mode: str, **kwargs) -> IO:
 
         # gzip.open already returns a io.TextIOWrapper if encoding is specified
         # and its not in binary mode
-        return gzip.open(pp, mode=mode, **kwargs)  # type: ignore[return-value]  # ty: ignore[invalid-return-type]
+        return gzip.open(pp, mode=mode, **kwargs)  # type: ignore[return-value]  # ty: ignore[invalid-explicit-return]
     else:
         return pp.open(mode=mode, **kwargs)
 
