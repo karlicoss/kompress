@@ -49,7 +49,7 @@ class TarPath(Path):
         if isinstance(tar, TarPath):
             # make sure TarPath(TarPath(...)) works
             assert _node is None, _node  # just in case
-            return tar  # type: ignore[return-value]  # ty: ignore[invalid-return-type]  # hmm doesn't like Self for some reason??
+            return tar  # type: ignore[return-value]  # ty: ignore[invalid-explicit-return]  # hmm doesn't like Self for some reason??
 
         if isinstance(tar, TarFile):
             # primary constructor, taking in Tarfile + relative Path
@@ -65,7 +65,7 @@ class TarPath(Path):
         if not path.exists():
             # if it doesn't exist, tarpath can't open it...
             # so it's the best we can do is just return a regular path
-            return path  # type: ignore[return-value]  # ty: ignore[invalid-return-type]
+            return path  # type: ignore[return-value]  # ty: ignore[invalid-explicit-return]
         if path.name.endswith('.tar.zst') and sys.version_info[:2] < (3, 14):
             raise RuntimeError(".tar.zst requires Python 3.14+")
 
