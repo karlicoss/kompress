@@ -108,7 +108,7 @@ def test_kopen_kexists(tmp_path: Path) -> None:
     """
     Testing deprecations, can remove when we remove kexists/kopen
     """
-    from .. import kexists, kopen  # type: ignore[attr-defined]  # ty: ignore[import-not-found]
+    from .. import kexists, kopen  # type: ignore[attr-defined]  # ty: ignore
 
     path = Path(tmp_path / 'file.zip')
 
